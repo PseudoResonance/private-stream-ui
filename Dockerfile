@@ -5,7 +5,7 @@ RUN bun i --frozen-lockfile -p
 COPY ./ /opt
 RUN bun run build
 
-FROM oven/bun:distroless
+FROM oven/bun:slim
 WORKDIR /opt
 COPY --from=builder /opt/dist/ ./
 
