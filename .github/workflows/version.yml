@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Exit when not on main branch
         run: |
           LATEST_TAG=$(git describe --match "*" --exclude "private-stream-ui-*" --abbrev=0 --tags HEAD)
