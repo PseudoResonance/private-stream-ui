@@ -8,7 +8,7 @@
 	"scripts": {
 		"dev": "bun run --hot ./src/index.ts",
 		"prod": "bun run ./src/index.ts",
-		"build": "bun build ./src/index.ts --minify --outdir=dist",
+		"build": "bun build --target=bun --production --outdir=dist ./src/index.ts",
 		"test": "bun test"
 	},
 	"exports": {

@@ -1,12 +1,14 @@
 .devcontainer/*
 .github/*
 .vscode/*
+dist/*
 helm/*
 node_modules/*
 .dockerignore
 .gitignore
 .prettierrc.json
 config.default.json
+config.json
 docker-compose.yaml
 Dockerfile
 eslint.config.mjs

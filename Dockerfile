@@ -1,10 +1,13 @@
 FROM oven/bun:alpine AS builder
 COPY package.json bun.lock /opt/
 WORKDIR /opt
-RUN bun i -p
+RUN bun i --frozen-lockfile -p
 COPY ./ /opt
-# RUN bun run build
+RUN bun run build
 
-# FROM alpine:3
-# COPY --from=builder /opt/dist/private-stream-ui /opt/private-stream-ui
-ENTRYPOINT ["/usr/bin/env", "bun", "run", "prod"]
+FROM oven/bun:distroless
+WORKDIR /opt
+COPY --from=builder /opt/dist/ ./
+
+ENV NODE_ENV=production
+ENTRYPOINT ["bun", "index.js"]
