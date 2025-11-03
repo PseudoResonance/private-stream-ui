@@ -1,0 +1,33 @@
+{
+	"editor.formatOnSave": true,
+	"editor.formatOnPaste": false,
+	"editor.formatOnType": false,
+	"editor.formatOnSaveMode": "file",
+	"eslint.format.enable": true,
+	"javascript.format.semicolons": "insert",
+	"typescript.format.semicolons": "insert",
+	"editor.defaultFormatter": "mattbrannon.prettiest-eslint",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+	},
+	"eslint.validate": [
+		"javascript"
+	],
+	"editor.insertSpaces": true,
+	"editor.detectIndentation": false,
+	"[json]": {
+		"editor.defaultFormatter": "mattbrannon.prettiest-eslint"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "mattbrannon.prettiest-eslint"
+	},
+	"[javascript]": {
+		"editor.defaultFormatter": "mattbrannon.prettiest-eslint"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "mattbrannon.prettiest-eslint"
+	},
+	"[dockerfile]": {
+		"editor.defaultFormatter": "ms-azuretools.vscode-docker"
+	}
+}

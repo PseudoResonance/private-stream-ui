@@ -1,0 +1,44 @@
+{
+	"name": "private-stream-ui",
+	"version": "1.0.0",
+	"description": "A convenient web UI to act as a frontend for MediaMTX.",
+	"author": "PseudoResonance",
+	"main": "./src/index.ts",
+	"private": true,
+	"scripts": {
+		"dev": "bun run --hot ./src/index.ts",
+		"prod": "bun run ./src/index.ts",
+		"build": "bun build ./src/index.ts --minify --outdir=dist",
+		"test": "bun test"
+	},
+	"exports": {
+		"@": "./src/"
+	},
+	"dependencies": {
+		"immutability-helper": "^3.1.1",
+		"lit": "^3.3.1",
+		"yargs": "^18.0.0"
+	},
+	"devDependencies": {
+		"@eslint/eslintrc": "^3.3.0",
+		"@eslint/js": "^9.23.0",
+		"@types/bun": "latest",
+		"@types/yargs": "^17.0.34",
+		"@typescript-eslint/parser": "^8.25.0",
+		"eslint": "^9.21.0",
+		"eslint-config-prettier": "^10.0.2",
+		"eslint-plugin-jsdoc": "^50.6.11",
+		"eslint-plugin-perfectionist": "^4.10.1",
+		"eslint-plugin-prettier": "^5.2.5",
+		"eslint-plugin-sort-keys-fix": "^1.1.2",
+		"eslint-plugin-typescript-sort-keys": "^3.3.0",
+		"eslint-plugin-lit": "^2.1.1",
+		"prettier": "^3.5.3",
+		"prettier-eslint": "^16.4.1",
+		"typescript": "^5.8.2",
+		"typescript-eslint": "^8.28.0"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	}
+}

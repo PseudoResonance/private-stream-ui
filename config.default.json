@@ -1,0 +1,6 @@
+{
+	"httpPort": 8080,
+	"providerBase": "https://localhost",
+	"webRtcPort": 9090,
+	"hlsPort": 9191
+}

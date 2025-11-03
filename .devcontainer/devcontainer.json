@@ -1,0 +1,50 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/alpine
+{
+	"name": "Private Stream UI",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"build": {
+		// Path is relative to the devcontainer.json file.
+		"dockerfile": "Dockerfile",
+		"args": {
+			"REMOTE_USER": "${localEnv:USER}",
+			"REMOTE_UID": "${localEnv:REMOTE_UID:1000}",
+			"REMOTE_GID": "${localEnv:REMOTE_GID:1000}"
+		}
+	},
+	"remoteUser": "${localEnv:USER}",
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/cirolosapio/devcontainers-features/alpine-docker-outside-of-docker:0": {
+			"installDockerCompose": true
+		}
+	},
+	"runArgs": [
+		"--network=host"
+	],
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"dbaeumer.vscode-eslint",
+				"christian-kohler.npm-intellisense",
+				"esbenp.prettier-vscode",
+				"oven.bun-vscode",
+				"mattbrannon.prettiest-eslint",
+				"ms-kubernetes-tools.vscode-kubernetes-tools"
+			]
+		}
+	},
+	"containerEnv": {
+		"ENV": "/etc/profile"
+	},
+	"mounts": [
+		"source=/home/${localEnv:USER}/.config,target=/home/${localEnv:USER}/.config,type=bind",
+		"source=private-stream-ui-devcontainer-history,target=/shellhistory,type=volume"
+	],
+	"workspaceMount": "source=${localWorkspaceFolder},target=/opt,type=bind",
+	"workspaceFolder": "/opt"
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "./.devcontainer/init.sh"
+}
