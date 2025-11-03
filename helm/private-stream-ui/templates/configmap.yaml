@@ -6,4 +6,4 @@ metadata:
     {{- include "private-stream-ui.labels" . | nindent 4 }}
 data:
   config.yml: |
-    {{- toYaml .Values.config | nindent 4 }}
+    {{- toJson .Values.config | nindent 4 }}
