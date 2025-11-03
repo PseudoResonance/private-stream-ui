@@ -13,7 +13,11 @@ export class PlayerControls extends LitElement {
 	@property({ type: Boolean })
 	disabled: boolean = false;
 	@property({ type: Object })
-	videoState: VideoState = { playing: false, fullscreen: false };
+	videoState: VideoState = {
+		playing: false,
+		fullscreen: false,
+		bufferLength: 2000,
+	};
 	@property()
 	updateVideoState: (stateUpdate: Partial<VideoState>) => void = () => {};
 	@property()
@@ -21,6 +25,10 @@ export class PlayerControls extends LitElement {
 
 	@state()
 	private _settingsActive: boolean = false;
+
+	private static updateTimerTimeout = 1000;
+
+	private _updateTimer: NodeJS.Timeout | undefined = undefined;
 
 	constructor() {
 		super();
@@ -30,13 +38,30 @@ export class PlayerControls extends LitElement {
 				const settingsElem =
 					this.shadowRoot?.getElementById("player-settings");
 				if (
-					!settingsElem?.contains(
-						(e as any).explicitOriginalTarget as Node,
-					) &&
-					this._settingsActive
+					settingsElem?.getBoundingClientRect() &&
+					!(
+						e.pageX >= settingsElem?.getBoundingClientRect().x &&
+						e.pageX <=
+							settingsElem?.getBoundingClientRect().x +
+								settingsElem?.getBoundingClientRect().width &&
+						e.pageY >= settingsElem?.getBoundingClientRect().y &&
+						e.pageY <=
+							settingsElem?.getBoundingClientRect().y +
+								settingsElem?.getBoundingClientRect().height
+					)
 				) {
-					this._settingsActive = false;
+					if (this._settingsActive) {
+						this._settingsActive = false;
+					}
 				}
+				// if (
+				// 	!settingsElem?.contains(
+				// 		(e as any).explicitOriginalTarget as Node,
+				// 	) &&
+				// 	this._settingsActive
+				// ) {
+				// 	this._settingsActive = false;
+				// }
 			},
 			{ capture: true },
 		);
@@ -115,6 +140,29 @@ export class PlayerControls extends LitElement {
 					id="player-settings"
 					class="settings ${this._settingsActive ? "active" : ""}"
 				>
+					<span class="button slider">
+						<label for="buffer-length">Buffer Size</label>
+						<input
+							id="buffer-length"
+							type="range"
+							min="0"
+							max="4000"
+							@input="${(e: InputEvent) => {
+								const val = (e.target as HTMLInputElement)
+									.value;
+								clearTimeout(this._updateTimer);
+								this._updateTimer = setTimeout(() => {
+									this.updateVideoState({
+										bufferLength:
+											Number.parseInt(val) === 0
+												? null
+												: Number.parseInt(val),
+									});
+								}, PlayerControls.updateTimerTimeout);
+							}}"
+							value=${this.videoState.bufferLength ?? 0}
+						/>
+					</span>
 					<span
 						class="button"
 						@click="${() => {

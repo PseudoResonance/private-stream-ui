@@ -47,9 +47,14 @@ export class StreamPlayer extends LitElement {
 		window.addEventListener("beforeunload", () => {
 			this._streamReader.close();
 		});
+		this._statsTimer = setTimeout(
+			this._processStats,
+			StreamPlayer._statsTimeout,
+		);
 	}
 
 	private static _retryTimeout = 2000;
+	private static _statsTimeout = 10000;
 
 	@property({ type: Number })
 	activityTimeout: number = 2000;
@@ -65,12 +70,17 @@ export class StreamPlayer extends LitElement {
 	@state()
 	private _errorMessage: TemplateResult<1> | string = "Loading Stream";
 	@state()
-	private _videoState: VideoState = { playing: false, fullscreen: false };
+	private _videoState: VideoState = {
+		playing: false,
+		fullscreen: false,
+		bufferLength: null,
+	};
 	@state()
 	private _videoResolution: VideoResolution = { x: 16, y: 9 };
 
 	private _streamProtocol: StreamProtocol;
 
+	private _statsTimer: NodeJS.Timeout | undefined = undefined;
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
 	private _activityTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
@@ -107,6 +117,7 @@ export class StreamPlayer extends LitElement {
 			videoElem.disablePictureInPicture = false;
 			await this._streamReader.start(
 				videoElem as HTMLVideoElement,
+				this._videoState.bufferLength,
 				(e) => {
 					if (e && typeof e === "object") {
 						if ("message" in e) {
@@ -142,6 +153,50 @@ export class StreamPlayer extends LitElement {
 		}
 	};
 
+	private _processStats = async () => {
+		const stats = await this._streamReader.getStats();
+		if (stats) {
+			if (
+				typeof stats === "object" &&
+				stats.constructor.name === "RTCStatsReport"
+			) {
+				const statsObj = {
+					bytesReceived: 0,
+					jitter: 0,
+					jitterBuffer: 0,
+					packetsDiscarded: 0,
+					packetsLost: 0,
+					packetsReceived: 0,
+				};
+				let jitterArr: number[] = [];
+				let jitterBufferArr: number[] = [];
+				(stats as RTCStatsReport).forEach((entry) => {
+					if (entry.type === "inbound-rtp") {
+						statsObj.bytesReceived += entry.bytesReceived;
+						jitterArr.push(entry.jitter);
+						jitterBufferArr.push(
+							entry.jitterBufferTargetDelay /
+								entry.jitterBufferEmittedCount,
+						);
+						statsObj.packetsDiscarded += entry.packetsDiscarded;
+						statsObj.packetsLost += entry.packetsLost;
+						statsObj.packetsReceived += entry.packetsReceived;
+					}
+				});
+				statsObj.jitter =
+					jitterArr.reduce((a, b) => a + b, 0) / jitterArr.length;
+				statsObj.jitterBuffer =
+					jitterBufferArr.reduce((a, b) => a + b, 0) /
+					jitterBufferArr.length;
+				console.log(statsObj);
+			}
+		}
+		this._statsTimer = setTimeout(
+			this._processStats,
+			StreamPlayer._statsTimeout,
+		);
+	};
+
 	private _activityTimerFunc = () => {
 		if (!this._hovering && !this._submenuOpen) {
 			this._active = false;
@@ -161,6 +216,9 @@ export class StreamPlayer extends LitElement {
 			const value = v as VideoState[keyof VideoState];
 			if (v !== this._videoState[key]) {
 				const oldValue = this._videoState[key];
+				const playerElem = this.shadowRoot?.getElementById(
+					"html-player",
+				) as HTMLVideoElement | null;
 				switch (key) {
 					case "fullscreen":
 						if (value === true) {
@@ -170,14 +228,20 @@ export class StreamPlayer extends LitElement {
 						}
 						break;
 					case "playing":
-						const playerElem = this.shadowRoot?.getElementById(
-							"html-player",
-						) as HTMLVideoElement | null;
 						if (value === true) {
 							playerElem?.play();
 						} else {
 							playerElem?.pause();
 						}
+						break;
+					case "bufferLength":
+						console.log(
+							`Setting buffer size to ${value === null ? "default" : value}`,
+						);
+						this._updateVideoStateInternal({
+							bufferLength: { $set: value as number },
+						});
+						this._streamReader.setBufferLength(value as number);
 						break;
 				}
 			}

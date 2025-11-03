@@ -24,6 +24,7 @@ export type Mutable<T> = {
 export type VideoState = Immutable<{
 	playing: boolean;
 	fullscreen: boolean;
+	bufferLength: number | null;
 }>;
 
 export type VideoResolution = Immutable<{ x: number; y: number }>;

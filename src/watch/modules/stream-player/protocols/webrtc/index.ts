@@ -15,6 +15,7 @@ interface SDPOffer {
 }
 
 interface WebRTCReaderConf extends ReaderConf {
+	bufferLength: number | null;
 	onTrack: (evt: RTCTrackEvent) => void;
 }
 
@@ -348,8 +349,38 @@ export class WebRTCReader extends GenericReader {
 	}
 
 	private onTrack(evt: RTCTrackEvent) {
-		if (typeof this.childConf?.onTrack === "function") {
-			this.childConf.onTrack(evt);
+		try {
+			if (
+				this.childConf?.bufferLength === null ||
+				this.childConf?.bufferLength >
+					(evt.receiver.jitterBufferTarget ?? 0)
+			) {
+				evt.receiver.jitterBufferTarget =
+					this.childConf?.bufferLength === null
+						? null
+						: Math.min(this.childConf?.bufferLength, 4000);
+			}
+		} catch (e) {
+			console.error(e);
 		}
+		try {
+			if (typeof this.childConf?.onTrack === "function") {
+				this.childConf.onTrack(evt);
+			}
+		} catch (e) {
+			this.handleError(new Error("Error while receiving track"));
+		}
+	}
+
+	public async getStats(): Promise<unknown> {
+		if (this.peerConnection) {
+			return await this.peerConnection.getStats();
+		}
+	}
+
+	public setBufferLength(length: number | null) {
+		this.peerConnection?.getReceivers().forEach((rec) => {
+			rec.jitterBufferTarget = length;
+		});
 	}
 }

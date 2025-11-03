@@ -31,6 +31,10 @@ export abstract class GenericReader {
 		this.state = PlayerState.CLOSED;
 	}
 
+	public abstract getStats(): Promise<unknown>;
+
+	public abstract setBufferLength(length: number | null): void;
+
 	protected handleError(err: unknown) {
 		if (typeof this.conf.onError === "function") {
 			this.conf.onError(err);

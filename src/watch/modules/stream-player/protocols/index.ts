@@ -30,6 +30,10 @@ export class StreamReader {
 
 	private reader: GenericReader | undefined = undefined;
 
+	private video: HTMLVideoElement | undefined = undefined;
+	private bufferLength: number | null = null;
+	private onError: (err: unknown) => void = () => {};
+
 	constructor() {}
 
 	public async setup(streamProtocol: StreamProtocol) {
@@ -56,17 +60,42 @@ export class StreamReader {
 
 	public async start(
 		video: HTMLVideoElement,
+		bufferLength: number | null,
 		onError: (err: unknown) => void,
 	) {
+		this.video = video;
+		this.bufferLength = bufferLength;
+		this.onError = onError;
+		this._start();
+	}
+
+	private _start() {
 		this.reader = new WebRTCReader({
 			url: this.streamUrl,
 			protocol: this.streamProtocol,
-			onError: onError,
+			bufferLength: this.bufferLength,
+			onError: this.onError,
 			onTrack: (evt: unknown) => {
-				video.srcObject = (evt as RTCTrackEvent)
-					.streams[0] as MediaProvider;
+				if (this.video) {
+					this.video.srcObject = (evt as RTCTrackEvent)
+						.streams[0] as MediaProvider;
+				}
 			},
 		});
+	}
+
+	public async getStats(): Promise<unknown> {
+		if (this.reader) {
+			return await this.reader.getStats();
+		}
+	}
+
+	public setBufferLength(length: number | null) {
+		if (this.reader) {
+			this.bufferLength = length;
+			this.reader.close();
+			this._start();
+		}
 	}
 
 	private formUrl(
