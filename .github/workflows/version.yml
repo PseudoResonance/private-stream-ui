@@ -43,8 +43,7 @@ jobs:
     if: needs.precheck.outputs.status == 'run'
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
-      contents: read
-      packages: write
+      contents: write
       #
     steps:
       - name: Checkout repository
