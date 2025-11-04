@@ -1,11 +1,14 @@
 #
-name: Publish Container Image
+name: Tag and Publish
 
 # Configures this workflow to run every time a change is pushed to the branch called `release`.
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - "main"
+    paths:
+      - "package.json"
+      - "**"
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
@@ -19,17 +22,49 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.teststep.outputs.status }}
+      new_version: ${{ steps.teststep.outputs.new_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - id: teststep
-        name: Exit when not on main branch
-        if: endsWith(github.event.base_ref, 'main') == false
-        run: echo "status=skip" >> $GITHUB_OUTPUT
-  build-and-push-image:
+        name: Exit when version not bumped
+        run: |
+          LATEST_TAG=$(git describe --match "*" --exclude "private-stream-ui-*" --abbrev=0 --tags HEAD)
+          CURRENT_VERSION=$(npm pkg get version | xargs)
+          echo "Previous: \"${LATEST_TAG}\" Current: \"${CURRENT_VERSION}\""
+          if [ $LATEST_TAG == $CURRENT_VERSION ]; then
+            echo "Version not bumped, skipping"
+            echo "status=skip" >> $GITHUB_OUTPUT
+          else
+            echo "Version bumped, continuing"
+            echo "status=run" >> $GITHUB_OUTPUT
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+  tag-commit:
     runs-on: ubuntu-latest
     needs: precheck
-    if: needs.precheck.outputs.status != 'skip'
+    if: needs.precheck.outputs.status == 'run'
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: write
+      #
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Tag commit
+        run: |
+          git tag -a "${{ needs.precheck.outputs.new_version }}" -m "Release v${{ needs.precheck.outputs.new_version }}"
+          git push origin "${{ needs.precheck.outputs.new_version }}"
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    needs: [tag-commit, precheck]
+    if: needs.precheck.outputs.status == 'run'
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read
