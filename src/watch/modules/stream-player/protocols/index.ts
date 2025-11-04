@@ -2,13 +2,15 @@ import { WebRTCReader } from "./webrtc/index.ts";
 import { fetchUrls } from "./backend.ts";
 import type { ApiUrlData } from "../../../../types.ts";
 import type { GenericReader } from "./interface.ts";
+import { HLSReader } from "./hls/index.ts";
 
 export enum StreamProtocol {
-	WebRTCTCP = "webrtc-tcp",
-	WebRTCUDP = "webrtc-udp",
+	WebRTC_TCP = "webrtc-tcp",
+	WebRTC_UDP = "webrtc-udp",
+	HLS = "hls",
 }
 
-const defaultProtocol = StreamProtocol.WebRTCUDP;
+const defaultProtocol = StreamProtocol.WebRTC_UDP;
 
 export function streamProtocolFromString(
 	protocol: string | undefined | null,
@@ -34,7 +36,28 @@ export class StreamReader {
 	private bufferLength: number | null = null;
 	private onError: (err: unknown) => void = () => {};
 
-	constructor() {}
+	private supportedProtocols: StreamProtocol[] = [];
+
+	constructor() {
+		for (const k of Object.values(StreamProtocol)) {
+			switch (k) {
+				case StreamProtocol.WebRTC_TCP:
+				case StreamProtocol.WebRTC_UDP:
+					if (WebRTCReader.supported()) {
+						this.supportedProtocols.push(k);
+					}
+					break;
+				case StreamProtocol.HLS:
+					if (HLSReader.supported()) {
+						this.supportedProtocols.push(k);
+					}
+					break;
+				default:
+					console.error(`No case for protocol ${k}!`);
+					break;
+			}
+		}
+	}
 
 	public async setup(streamProtocol: StreamProtocol) {
 		this.streamProtocol = streamProtocol;
@@ -69,19 +92,52 @@ export class StreamReader {
 		this._start();
 	}
 
+	public getSupportedProtocols() {
+		return this.supportedProtocols;
+	}
+
 	private _start() {
-		this.reader = new WebRTCReader({
-			url: this.streamUrl,
-			protocol: this.streamProtocol,
-			bufferLength: this.bufferLength,
-			onError: this.onError,
-			onTrack: (evt: unknown) => {
+		switch (this.streamProtocol) {
+			case StreamProtocol.WebRTC_TCP:
+			case StreamProtocol.WebRTC_UDP:
+				this.reader = new WebRTCReader({
+					url: this.streamUrl,
+					protocol: this.streamProtocol,
+					bufferLength: this.bufferLength,
+					onError: this.onError,
+					onTrack: (evt: unknown) => {
+						if (this.video) {
+							this.video.srcObject = (evt as RTCTrackEvent)
+								.streams[0] as MediaProvider;
+						}
+					},
+				});
+				break;
+			case StreamProtocol.HLS:
 				if (this.video) {
-					this.video.srcObject = (evt as RTCTrackEvent)
-						.streams[0] as MediaProvider;
+					this.reader = new HLSReader({
+						url: this.streamUrl,
+						protocol: this.streamProtocol,
+						bufferLength: this.bufferLength,
+						videoElement: this.video,
+						onError: this.onError,
+						onTrack: (evt: unknown) => {},
+					});
+				} else {
+					throw {
+						message: "Unable to start player",
+						error: new Error("Invalid video element"),
+					};
 				}
-			},
-		});
+				break;
+			default:
+				throw {
+					message: "Unable to start player",
+					error: new Error(
+						`No case for protocol ${this.streamProtocol}!`,
+					),
+				};
+		}
 	}
 
 	public async getStats(): Promise<unknown> {
@@ -104,9 +160,11 @@ export class StreamReader {
 		protocol: StreamProtocol,
 	) {
 		switch (protocol) {
-			case StreamProtocol.WebRTCTCP:
-			case StreamProtocol.WebRTCUDP:
+			case StreamProtocol.WebRTC_TCP:
+			case StreamProtocol.WebRTC_UDP:
 				return `${urlData.base}:${urlData.webRtcPort}/${videoId}/whep`;
+			case StreamProtocol.HLS:
+				return `${urlData.base}:${urlData.hlsPort}/${videoId}/index.m3u8`;
 			default:
 				throw new Error(`Unknown protocol ${protocol}`);
 		}

@@ -21,12 +21,6 @@ export type Mutable<T> = {
 		: MutableObject<T[K]>;
 };
 
-export type VideoState = Immutable<{
-	playing: boolean;
-	fullscreen: boolean;
-	bufferLength: number | null;
-}>;
-
 export type VideoResolution = Immutable<{ x: number; y: number }>;
 
 export enum PlayerState {

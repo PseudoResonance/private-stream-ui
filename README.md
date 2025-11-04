@@ -2,6 +2,8 @@
 
 A convenient web UI to act as a frontend for MediaMTX.
 
+Video player UI utilizes [MediaChrome](https://www.media-chrome.org/).
+
 ## Installation
 
 A Dockerfile is provided to build a Docker container to run the exporter. Additionally, a Kubernetes Helm chart is included for easy deployment.

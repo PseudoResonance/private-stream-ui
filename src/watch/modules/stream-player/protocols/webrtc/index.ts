@@ -52,6 +52,10 @@ export class WebRTCReader extends GenericReader {
 		}
 	}
 
+	public static supported(): boolean {
+		return true;
+	}
+
 	private async requestICEServers(): Promise<ICEServerList[]> {
 		const result = await fetch(this.conf.url, {
 			headers: {
@@ -221,7 +225,7 @@ export class WebRTCReader extends GenericReader {
 			new RTCSessionDescription({
 				sdp: await WebRTCReader.filterAnswer(
 					answer,
-					this.conf.protocol === StreamProtocol.WebRTCTCP
+					this.conf.protocol === StreamProtocol.WebRTC_TCP
 						? "tcp"
 						: "udp",
 				),
@@ -266,7 +270,9 @@ export class WebRTCReader extends GenericReader {
 			body: WebRTCReader.generateSdpFragment(
 				this.offerData,
 				candidates,
-				this.conf.protocol === StreamProtocol.WebRTCTCP ? "tcp" : "udp",
+				this.conf.protocol === StreamProtocol.WebRTC_TCP
+					? "tcp"
+					: "udp",
 			),
 			headers: {
 				"Content-Type": "application/trickle-ice-sdpfrag",

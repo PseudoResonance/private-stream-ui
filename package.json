@@ -1,6 +1,6 @@
 {
 	"name": "private-stream-ui",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"description": "A convenient web UI to act as a frontend for MediaMTX.",
 	"author": "PseudoResonance",
 	"main": "./src/index.ts",
@@ -15,8 +15,9 @@
 		"@": "./src/"
 	},
 	"dependencies": {
-		"immutability-helper": "^3.1.1",
+		"hls.js": "^1.6.14",
 		"lit": "^3.3.1",
+		"media-chrome": "^4.15.1",
 		"yargs": "^18.0.0"
 	},
 	"devDependencies": {

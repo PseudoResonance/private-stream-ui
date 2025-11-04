@@ -1,29 +1,36 @@
-import { html, css, LitElement, type TemplateResult } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import update, { type Spec } from "immutability-helper";
+import {
+	html,
+	css,
+	LitElement,
+	type TemplateResult,
+	type PropertyValues,
+} from "lit";
+import { customElement, state } from "lit/decorators.js";
 
-import "./controls.ts";
-import { PlayerState, type VideoResolution, type VideoState } from "./types.ts";
+import "media-chrome";
+import "media-chrome/menu";
+import { PlayerState, type VideoResolution } from "./types.ts";
 import {
 	StreamProtocol,
 	streamProtocolFromString,
 	StreamReader,
 } from "./protocols/index.ts";
+import {
+	createIndicator,
+	createMenuItem,
+} from "media-chrome/dist/menu/media-chrome-menu.js";
+import { classMap } from "lit/directives/class-map.js";
 
 @customElement("stream-player")
 export class StreamPlayer extends LitElement {
+	private static _retryTimeout = 2000;
+	private static _statsTimeout = 10000;
+
 	constructor() {
 		super();
 		this._streamProtocol = streamProtocolFromString(
 			localStorage.getItem("stream-protocol"),
 		);
-		this.addEventListener("fullscreenchange", () => {
-			if (document.fullscreenElement === this) {
-				this._updateVideoStateInternal({ fullscreen: { $set: true } });
-			} else if (document.fullscreenElement === null) {
-				this._updateVideoStateInternal({ fullscreen: { $set: false } });
-			}
-		});
 		const viewportResizeObserver = new ResizeObserver(() => {
 			this._recalculateVideoFit();
 		});
@@ -40,25 +47,40 @@ export class StreamPlayer extends LitElement {
 		);
 	}
 
-	private static _retryTimeout = 2000;
-	private static _statsTimeout = 10000;
-
-	@property({ type: Number })
-	activityTimeout: number = 2000;
+	protected firstUpdated(_changedProperties: PropertyValues): void {
+		const videoElem = this.shadowRoot?.getElementById(
+			"html-player",
+		) as HTMLVideoElement | null;
+		if (videoElem === null) {
+			console.error("Unable to find video element!");
+			return;
+		}
+		videoElem.controls = false;
+		videoElem.muted = false;
+		videoElem.autoplay = true;
+		videoElem.playsInline = true;
+		videoElem.disablePictureInPicture = false;
+		if ("getAutoplayPolicy" in navigator) {
+			switch ((navigator as any).getAutoplayPolicy("mediaelement")) {
+				case "allowed":
+					break;
+				case "allowed-muted":
+					console.log("Detected autoplay must be muted!");
+					videoElem.muted = true;
+					break;
+				default:
+					break;
+			}
+		}
+	}
 
 	@state()
 	private _videoInitState: PlayerState = PlayerState.LOADING;
 	@state()
 	private _errorMessage: TemplateResult<1> | string = "Loading Stream";
 	@state()
-	private _videoState: VideoState = {
-		playing: false,
-		fullscreen: false,
-		bufferLength: null,
-	};
-	@state()
 	private _videoResolution: VideoResolution = { x: 16, y: 9 };
-
+	@state()
 	private _streamProtocol: StreamProtocol;
 
 	private _statsTimer: NodeJS.Timeout | undefined = undefined;
@@ -82,7 +104,6 @@ export class StreamPlayer extends LitElement {
 
 	private _setupPlayer = async () => {
 		try {
-			await this._streamReader.setup(this._streamProtocol);
 			const videoElem = this.shadowRoot?.getElementById(
 				"html-player",
 			) as HTMLVideoElement | null;
@@ -90,14 +111,10 @@ export class StreamPlayer extends LitElement {
 				console.error("Unable to find video element!");
 				return;
 			}
-			videoElem.controls = false;
-			videoElem.muted = false;
-			videoElem.autoplay = true;
-			videoElem.playsInline = true;
-			videoElem.disablePictureInPicture = false;
+			await this._streamReader.setup(this._streamProtocol);
 			await this._streamReader.start(
-				videoElem as HTMLVideoElement,
-				this._videoState.bufferLength,
+				videoElem,
+				null, //TODO buffer size
 				(e) => {
 					if (e && typeof e === "object") {
 						if ("message" in e) {
@@ -134,92 +151,56 @@ export class StreamPlayer extends LitElement {
 	};
 
 	private _processStats = async () => {
-		const stats = await this._streamReader.getStats();
-		if (stats) {
-			if (
-				typeof stats === "object" &&
-				stats.constructor.name === "RTCStatsReport"
-			) {
-				const statsObj = {
-					bytesReceived: 0,
-					jitter: 0,
-					jitterBuffer: 0,
-					packetsDiscarded: 0,
-					packetsLost: 0,
-					packetsReceived: 0,
-				};
-				let jitterArr: number[] = [];
-				let jitterBufferArr: number[] = [];
-				(stats as RTCStatsReport).forEach((entry) => {
-					if (entry.type === "inbound-rtp") {
-						statsObj.bytesReceived += entry.bytesReceived;
-						jitterArr.push(entry.jitter);
-						jitterBufferArr.push(
-							entry.jitterBufferTargetDelay /
-								entry.jitterBufferEmittedCount,
-						);
-						statsObj.packetsDiscarded += entry.packetsDiscarded;
-						statsObj.packetsLost += entry.packetsLost;
-						statsObj.packetsReceived += entry.packetsReceived;
-					}
-				});
-				statsObj.jitter =
-					jitterArr.reduce((a, b) => a + b, 0) / jitterArr.length;
-				statsObj.jitterBuffer =
-					jitterBufferArr.reduce((a, b) => a + b, 0) /
-					jitterBufferArr.length;
-				console.log(statsObj);
+		try {
+			let stats;
+			if (this._streamReader) {
+				try {
+					stats = await this._streamReader.getStats();
+				} catch (_) {}
 			}
+			if (stats) {
+				if (
+					typeof stats === "object" &&
+					stats.constructor.name === "RTCStatsReport"
+				) {
+					const statsObj = {
+						bytesReceived: 0,
+						jitter: 0,
+						jitterBuffer: 0,
+						packetsDiscarded: 0,
+						packetsLost: 0,
+						packetsReceived: 0,
+					};
+					let jitterArr: number[] = [];
+					let jitterBufferArr: number[] = [];
+					(stats as RTCStatsReport).forEach((entry) => {
+						if (entry.type === "inbound-rtp") {
+							statsObj.bytesReceived += entry.bytesReceived;
+							jitterArr.push(entry.jitter);
+							jitterBufferArr.push(
+								entry.jitterBufferTargetDelay /
+									entry.jitterBufferEmittedCount,
+							);
+							statsObj.packetsDiscarded += entry.packetsDiscarded;
+							statsObj.packetsLost += entry.packetsLost;
+							statsObj.packetsReceived += entry.packetsReceived;
+						}
+					});
+					statsObj.jitter =
+						jitterArr.reduce((a, b) => a + b, 0) / jitterArr.length;
+					statsObj.jitterBuffer =
+						jitterBufferArr.reduce((a, b) => a + b, 0) /
+						jitterBufferArr.length;
+					console.log(statsObj);
+				}
+			}
+		} catch (e) {
+			console.error("Error while fetching stats", e);
 		}
 		this._statsTimer = setTimeout(
 			this._processStats,
 			StreamPlayer._statsTimeout,
 		);
-	};
-
-	private _updateVideoStateInternal(stateUpdate: Spec<VideoState, never>) {
-		this._videoState = update(this._videoState, stateUpdate);
-	}
-
-	private _updateVideoState = (stateUpdate: Partial<VideoState>) => {
-		for (const [k, v] of Object.entries(stateUpdate)) {
-			if (v === undefined) {
-				continue;
-			}
-			const key = k as keyof VideoState;
-			const value = v as VideoState[keyof VideoState];
-			if (v !== this._videoState[key]) {
-				const oldValue = this._videoState[key];
-				const playerElem = this.shadowRoot?.getElementById(
-					"html-player",
-				) as HTMLVideoElement | null;
-				switch (key) {
-					case "fullscreen":
-						if (value === true) {
-							this.requestFullscreen();
-						} else {
-							document.exitFullscreen();
-						}
-						break;
-					case "playing":
-						if (value === true) {
-							playerElem?.play();
-						} else {
-							playerElem?.pause();
-						}
-						break;
-					case "bufferLength":
-						console.log(
-							`Setting buffer size to ${value === null ? "default" : value}`,
-						);
-						this._updateVideoStateInternal({
-							bufferLength: { $set: value as number },
-						});
-						this._streamReader.setBufferLength(value as number);
-						break;
-				}
-			}
-		}
 	};
 
 	private _recalculateVideoFit = () => {
@@ -244,6 +225,66 @@ export class StreamPlayer extends LitElement {
 		}
 	};
 
+	videoTemplate() {
+		return html` <video
+			slot="media"
+			id="html-player"
+			class="${this._videoInitState}"
+			controlslist="nodownload"
+			@loadeddata="${(e: Event) => {
+				this._videoResolution = {
+					x: (e.composedPath()[0] as HTMLVideoElement).videoWidth,
+					y: (e.composedPath()[0] as HTMLVideoElement).videoHeight,
+				};
+				this._recalculateVideoFit();
+				this._videoInitState = PlayerState.READY;
+				this._errorMessage = "";
+			}}"
+		></video>`;
+	}
+
+	settingsTemplate() {
+		const supportedProtocols = this._streamReader.getSupportedProtocols();
+		return html` <media-settings-menu hidden anchor="auto">
+			<media-settings-menu-item>
+				Protocol
+				<media-chrome-menu
+					@change="${(e: Event) => {
+						try {
+							this._setStreamProtocol(
+								streamProtocolFromString(
+									(e.composedPath()[0] as HTMLInputElement)
+										.value,
+								),
+							);
+						} catch (e) {
+							console.error(e);
+							this._setStreamProtocol(StreamProtocol.WebRTC_UDP);
+						}
+					}}"
+					slot="submenu"
+					hidden
+				>
+					<div slot="title">Protocol</div>
+					${Object.entries(StreamProtocol)
+						.filter(([_, v]) => supportedProtocols.includes(v))
+						.map(([k, v]) => {
+							const item = createMenuItem({
+								type: "radio",
+								text: k.replaceAll("_", " "),
+								value: v,
+								checked: v === this._streamProtocol,
+							});
+							item.prepend(
+								createIndicator(this, "checked-indicator"),
+							);
+							return item;
+						})}
+				</media-chrome-menu>
+			</media-settings-menu-item>
+		</media-settings-menu>`;
+	}
+
 	static styles = css`
 		:host {
 			position: relative;
@@ -265,6 +306,11 @@ export class StreamPlayer extends LitElement {
 			min-height: 100vmin;
 			pointer-events: none;
 			touch-action: none;
+		}
+		video::-webkit-media-controls-start-playback-button,
+		video::-webkit-media-controls,
+		video::-webkit-media-controls-enclosure {
+			display: none !important;
 		}
 		.error {
 			position: absolute;
@@ -291,61 +337,59 @@ export class StreamPlayer extends LitElement {
 			border-radius: var(--border-radius);
 			/* backdrop-filter: var(--popup-filter); */
 		}
-		.controls {
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: 100%;
-			height: 100%;
-			max-width: 100svw;
-			max-height: 100svh;
-			font-size: x-large;
+
+		.spacer {
+			flex-grow: 1;
+			background-color: var(
+				--media-control-background,
+				rgba(20, 20, 30, 0.7)
+			);
+		}
+
+		media-airplay-button[mediaairplayunavailable],
+		media-cast-button[mediacastunavailable],
+		media-fullscreen-button[mediafullscreenunavailable],
+		media-pip-button[mediapipunavailable] {
+			display: none;
+		}
+
+		media-airplay-button[mediaisairplaying],
+		media-cast-button[mediaiscasting],
+		media-pip-button[mediaispip] {
+			--media-primary-color: var(--button-active-color);
 		}
 	`;
 
 	// src="https://44610fa9-3e30-4e16-b568-7529ed57cf0d.mdnplay.dev/shared-assets/videos/flower.webm"
 	render() {
 		return html`
-			<video
-				id="html-player"
-				class="${this._videoInitState}"
-				controlslist="nodownload"
-				@play="${() => {
-					this._updateVideoStateInternal({ playing: { $set: true } });
-				}}"
-				@pause="${() => {
-					this._updateVideoStateInternal({
-						playing: { $set: false },
-					});
-				}}"
-				@loadeddata="${(e: Event) => {
-					const trackSettings = (
-						(e.target as HTMLVideoElement).srcObject as MediaStream
-					)
-						.getVideoTracks()[0]
-						?.getSettings();
-					if (trackSettings) {
-						this._videoResolution = {
-							x: trackSettings.width as number,
-							y: trackSettings.height as number,
-						};
-					}
-					this._recalculateVideoFit();
-					this._videoInitState = PlayerState.READY;
-					this._errorMessage = "";
-				}}"
-			></video>
-			<div class="error ${this._errorMessage ? "active" : ""}">
+			<media-controller>
+				${this.videoTemplate()} ${this.settingsTemplate()}
+				<media-control-bar
+					aria-disabled=${this._errorMessage ? true : false}
+					style="${this._errorMessage ? "display: none;" : ""}"
+				>
+					<media-play-button></media-play-button>
+					<media-mute-button></media-mute-button>
+					<media-volume-range></media-volume-range>
+					<div class="spacer"></div>
+					<media-cast-button></media-cast-button>
+					<media-airplay-button></media-airplay-button>
+					<media-pip-button></media-pip-button>
+					<media-settings-menu-button></media-settings-menu-button>
+					<media-fullscreen-button></media-fullscreen-button>
+				</media-control-bar>
+			</media-controller>
+			<div
+				class=${classMap({
+					active: this._errorMessage ? true : false,
+					error: true,
+				})}
+				aria-hidden="${this._errorMessage ? false : true}"
+				aria-modal="${this._errorMessage ? true : false}"
+			>
 				<span class="errorContent">${this._errorMessage}</span>
 			</div>
-			<player-controls
-				class="controls"
-				?disabled="${this._videoInitState !== PlayerState.READY}"
-				activityTimeout="${this.activityTimeout}"
-				.videoState="${this._videoState}"
-				.updateVideoState="${this._updateVideoState}"
-				.setStreamProtocol="${this._setStreamProtocol}"
-			></player-controls>
 		`;
 	}
 }
