@@ -121,7 +121,6 @@ export class StreamReader {
 						bufferLength: this.bufferLength,
 						videoElement: this.video,
 						onError: this.onError,
-						onTrack: (evt: unknown) => {},
 					});
 				} else {
 					throw {

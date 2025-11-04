@@ -1,10 +1,9 @@
-import Hls from "hls.js";
+import Hls, { type ErrorData } from "hls.js";
 import { GenericReader, type ReaderConf } from "../interface";
 
 interface HLSReaderConf extends ReaderConf {
 	bufferLength: number | null;
 	videoElement: HTMLVideoElement;
-	onTrack: (evt: RTCTrackEvent) => void;
 }
 
 export class HLSReader extends GenericReader {
@@ -31,6 +30,7 @@ export class HLSReader extends GenericReader {
 			this.childConf.videoElement.src = "";
 			this.childConf.videoElement.srcObject = null;
 			this.inst.attachMedia(this.childConf.videoElement);
+			this.inst.on(Hls.Events.ERROR, this.onError);
 		} catch (err) {
 			this.handleError(err);
 		}
@@ -44,6 +44,13 @@ export class HLSReader extends GenericReader {
 
 	public static supported(): boolean {
 		return Hls.isSupported();
+	}
+
+	private onError(e: typeof Hls.Events.ERROR, data: ErrorData) {
+		if (data.fatal) {
+			this.handleError(new Error(`${data.details}`));
+		}
+		console.error(e, data);
 	}
 
 	public getStats(): Promise<unknown> {
