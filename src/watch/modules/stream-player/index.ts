@@ -17,19 +17,6 @@ export class StreamPlayer extends LitElement {
 		this._streamProtocol = streamProtocolFromString(
 			localStorage.getItem("stream-protocol"),
 		);
-		this.addEventListener("pointermove", () => {
-			clearTimeout(this._activityTimer);
-			this._active = true;
-			this._activityTimer = setTimeout(
-				this._activityTimerFunc,
-				this.activityTimeout,
-			);
-		});
-		this.addEventListener("pointerleave", () => {
-			clearTimeout(this._activityTimer);
-			this._hovering = false;
-			this._active = false;
-		});
 		this.addEventListener("fullscreenchange", () => {
 			if (document.fullscreenElement === this) {
 				this._updateVideoStateInternal({ fullscreen: { $set: true } });
@@ -60,12 +47,6 @@ export class StreamPlayer extends LitElement {
 	activityTimeout: number = 2000;
 
 	@state()
-	private _active: boolean = false;
-	@state()
-	private _hovering: boolean = false;
-	@state()
-	private _submenuOpen: boolean = false;
-	@state()
 	private _videoInitState: PlayerState = PlayerState.LOADING;
 	@state()
 	private _errorMessage: TemplateResult<1> | string = "Loading Stream";
@@ -82,7 +63,6 @@ export class StreamPlayer extends LitElement {
 
 	private _statsTimer: NodeJS.Timeout | undefined = undefined;
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
-	private _activityTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
 
 	private _setErrorMessage = (msg: string) => {
@@ -197,12 +177,6 @@ export class StreamPlayer extends LitElement {
 		);
 	};
 
-	private _activityTimerFunc = () => {
-		if (!this._hovering && !this._submenuOpen) {
-			this._active = false;
-		}
-	};
-
 	private _updateVideoStateInternal(stateUpdate: Spec<VideoState, never>) {
 		this._videoState = update(this._videoState, stateUpdate);
 	}
@@ -312,10 +286,10 @@ export class StreamPlayer extends LitElement {
 			box-sizing: border-box;
 		}
 		.error.active .errorContent {
-			backdrop-filter: var(--popup-filter);
 			padding: 10px;
 			background: var(--overlay-bg-color);
 			border-radius: var(--border-radius);
+			/* backdrop-filter: var(--popup-filter); */
 		}
 		.controls {
 			position: absolute;
@@ -325,8 +299,6 @@ export class StreamPlayer extends LitElement {
 			height: 100%;
 			max-width: 100svw;
 			max-height: 100svh;
-			pointer-events: none;
-			touch-action: none;
 			font-size: x-large;
 		}
 	`;
@@ -368,14 +340,8 @@ export class StreamPlayer extends LitElement {
 			</div>
 			<player-controls
 				class="controls"
-				@pointerleave="${() => {
-					this._hovering = false;
-				}}"
-				@pointerenter="${() => {
-					this._hovering = true;
-				}}"
 				?disabled="${this._videoInitState !== PlayerState.READY}"
-				?active="${this._active}"
+				activityTimeout="${this.activityTimeout}"
 				.videoState="${this._videoState}"
 				.updateVideoState="${this._updateVideoState}"
 				.setStreamProtocol="${this._setStreamProtocol}"

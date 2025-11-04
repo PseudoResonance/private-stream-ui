@@ -9,8 +9,6 @@ import { StreamProtocol } from "./protocols/index.ts";
 @customElement("player-controls")
 export class PlayerControls extends LitElement {
 	@property({ type: Boolean })
-	active: boolean = false;
-	@property({ type: Boolean })
 	disabled: boolean = false;
 	@property({ type: Object })
 	videoState: VideoState = {
@@ -22,13 +20,26 @@ export class PlayerControls extends LitElement {
 	updateVideoState: (stateUpdate: Partial<VideoState>) => void = () => {};
 	@property()
 	setStreamProtocol: (protocol: StreamProtocol) => void = () => {};
+	@property({ type: Number })
+	activityTimeout: number = 2000;
 
 	@state()
+	private _active: boolean = false;
+	@state()
+	private _hovering: boolean = false;
+	@state()
 	private _settingsActive: boolean = false;
+	// Check if the last input was touch based for use with the visibility toggle
+	@state()
+	private _lastInputIsTouch: boolean = false;
+	// Toggle visibility state for non mouse input
+	@state()
+	private _visibilityToggled: boolean = false;
 
 	private static updateTimerTimeout = 1000;
 
 	private _updateTimer: NodeJS.Timeout | undefined = undefined;
+	private _activityTimer: NodeJS.Timeout | undefined = undefined;
 
 	constructor() {
 		super();
@@ -38,34 +49,59 @@ export class PlayerControls extends LitElement {
 				const settingsElem =
 					this.shadowRoot?.getElementById("player-settings");
 				if (
-					settingsElem?.getBoundingClientRect() &&
-					!(
-						e.pageX >= settingsElem?.getBoundingClientRect().x &&
-						e.pageX <=
-							settingsElem?.getBoundingClientRect().x +
-								settingsElem?.getBoundingClientRect().width &&
-						e.pageY >= settingsElem?.getBoundingClientRect().y &&
-						e.pageY <=
-							settingsElem?.getBoundingClientRect().y +
-								settingsElem?.getBoundingClientRect().height
-					)
+					!settingsElem?.contains(e.composedPath()[0] as Node) &&
+					this._settingsActive
 				) {
-					if (this._settingsActive) {
-						this._settingsActive = false;
-					}
+					this._settingsActive = false;
 				}
-				// if (
-				// 	!settingsElem?.contains(
-				// 		(e as any).explicitOriginalTarget as Node,
-				// 	) &&
-				// 	this._settingsActive
-				// ) {
-				// 	this._settingsActive = false;
-				// }
 			},
 			{ capture: true },
 		);
+		this.addEventListener("pointerleave", () => {
+			clearTimeout(this._activityTimer);
+			this._hovering = false;
+			this._active = false;
+		});
+		this.addEventListener("pointermove", (e) => {
+			clearTimeout(this._activityTimer);
+			this._active = true;
+			this._activityTimer = setTimeout(
+				this._activityTimerFunc,
+				this.activityTimeout,
+			);
+			if (e.pointerType !== "mouse" && e.pointerType !== "pen") {
+				this._lastInputIsTouch = true;
+			} else {
+				this._lastInputIsTouch = false;
+				this._visibilityToggled = false;
+			}
+		});
+		this.addEventListener("click", (e) => {
+			if (e.pointerType !== "mouse" && e.pointerType !== "pen") {
+				this._lastInputIsTouch = true;
+				if (e.composedPath()[0] === this) {
+					this._visibilityToggled = !this._visibilityToggled;
+				}
+			} else {
+				this._lastInputIsTouch = false;
+				this._visibilityToggled = false;
+			}
+		});
 	}
+
+	private _activityTimerFunc = () => {
+		if (!this._hovering) {
+			this._active = false;
+		}
+	};
+
+	private _isControlsVisible = () => {
+		return (
+			(this._lastInputIsTouch
+				? this._visibilityToggled || this._settingsActive
+				: this._active || this._settingsActive) && !this.disabled
+		);
+	};
 
 	static styles = css`
 		:host {
@@ -75,6 +111,8 @@ export class PlayerControls extends LitElement {
 			grid-template-rows:
 				[start] 1fr [control-bar] var(--control-bar-height)
 				[end];
+			touch-action: initial;
+			pointer-events: initial;
 		}
 		.spacer {
 			margin-left: auto;
@@ -90,7 +128,7 @@ export class PlayerControls extends LitElement {
 			opacity: 100%;
 			pointer-events: initial;
 			touch-action: initial;
-			backdrop-filter: var(--popup-filter);
+			/* backdrop-filter: var(--popup-filter); */
 		}
 		.controlBar.inactive {
 			opacity: 0%;
@@ -103,6 +141,8 @@ export class PlayerControls extends LitElement {
 			display: flex;
 			align-items: end;
 			justify-content: flex-end;
+			pointer-events: none;
+			touch-action: none;
 		}
 		.settings {
 			color: var(--fg-color);
@@ -116,7 +156,7 @@ export class PlayerControls extends LitElement {
 			display: flex;
 			flex-direction: column;
 			background: var(--overlay-bg-color);
-			backdrop-filter: var(--popup-filter);
+			/* backdrop-filter: var(--popup-filter); */
 			--settings-padding: 5px;
 			padding: var(--settings-padding);
 			align-items: stretch;
@@ -180,10 +220,15 @@ export class PlayerControls extends LitElement {
 				</div>
 			</div>
 			<div
-				class="controlBar ${(this.active || this._settingsActive) &&
-				!this.disabled
+				class="controlBar ${this._isControlsVisible()
 					? "active"
 					: "inactive"}"
+				@pointerenter="${() => {
+					this._hovering = true;
+				}}"
+				@pointerleave="${() => {
+					this._hovering = false;
+				}}"
 			>
 				<player-controls-button
 					action="${this.videoState.playing ? "pause" : "play"}"
@@ -192,6 +237,7 @@ export class PlayerControls extends LitElement {
 							playing: !this.videoState.playing,
 						});
 					}}"
+					aria-label="${this.videoState.playing ? "pause" : "play"}"
 				></player-controls-button>
 				<div class="spacer"></div>
 				<player-controls-button
@@ -199,6 +245,7 @@ export class PlayerControls extends LitElement {
 					@click="${() => {
 						this._settingsActive = !this._settingsActive;
 					}}"
+					aria-label="settings"
 				></player-controls-button>
 				<player-controls-button
 					action="${this.videoState.fullscreen
@@ -209,6 +256,9 @@ export class PlayerControls extends LitElement {
 							fullscreen: !this.videoState.fullscreen,
 						});
 					}}"
+					aria-label="${this.videoState.fullscreen
+						? "minimize"
+						: "fullscreen"}"
 				></player-controls-button>
 			</div>`;
 	}
