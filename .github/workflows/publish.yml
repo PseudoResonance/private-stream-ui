@@ -17,10 +17,13 @@ jobs:
   precheck:
     # Validate branch first
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.teststep.outputs.status }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Exit when not on main branch
+      - id: teststep
+        name: Exit when not on main branch
         if: endsWith(github.event.base_ref, 'main') == false
         run: echo "status=skip" >> $GITHUB_OUTPUT
   build-and-push-image:

@@ -15,12 +15,16 @@ jobs:
   precheck:
     # Validate branch first
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.teststep.outputs.status }}
+      new_version: ${{ steps.teststep.outputs.new_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Exit when version not bumped
+      - id: teststep
+        name: Exit when version not bumped
         run: |
           LATEST_TAG=$(git describe --match "*" --exclude "private-stream-ui-*" --abbrev=0 --tags HEAD)
           CURRENT_VERSION=$(npm pkg get version | xargs)
