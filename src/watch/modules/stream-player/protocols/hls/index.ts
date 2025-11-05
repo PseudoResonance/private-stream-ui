@@ -1,4 +1,4 @@
-import Hls, { type ErrorData } from "hls.js";
+import Hls, { ErrorTypes, type ErrorData } from "hls.js";
 import { GenericReader, type ReaderConf } from "../interface";
 
 interface HLSReaderConf extends ReaderConf {
@@ -7,8 +7,12 @@ interface HLSReaderConf extends ReaderConf {
 }
 
 export class HLSReader extends GenericReader {
+	private static loadTimeout: number = 5000;
+
 	private childConf: HLSReaderConf;
 	private inst: Hls | undefined = undefined;
+
+	private loadTimer: NodeJS.Timeout | undefined = undefined;
 
 	constructor(conf: HLSReaderConf) {
 		super(conf);
@@ -20,17 +24,38 @@ export class HLSReader extends GenericReader {
 		super.start();
 		try {
 			this.inst = new Hls();
+			this.inst.on(Hls.Events.ERROR, this.onError);
 			this.inst.on(Hls.Events.MEDIA_ATTACHED, () => {
 				console.log("HLS bound to video element");
+				this.inst?.loadSource(this.conf.url);
+				this.loadTimer = setTimeout(() => {
+					this.inst?.destroy();
+					this.handleError(new Error("Stream Offline"));
+				}, HLSReader.loadTimeout);
 			});
 			this.inst.on(Hls.Events.MANIFEST_PARSED, () => {
 				console.log("HLS manifest loaded");
+				clearTimeout(this.loadTimer);
+				this.childConf.videoElement.play();
+				this.loadTimer = setTimeout(() => {
+					this.inst?.destroy();
+					this.handleError(new Error("Stream Offline"));
+				}, HLSReader.loadTimeout);
 			});
-			this.inst.loadSource(this.conf.url);
-			this.childConf.videoElement.src = "";
-			this.childConf.videoElement.srcObject = null;
+			this.childConf.videoElement.removeEventListener(
+				"play",
+				this.onPlayListener,
+			);
+			this.childConf.videoElement.addEventListener(
+				"play",
+				this.onPlayListener,
+			);
+			this.childConf.videoElement.pause();
+			try {
+				this.childConf.videoElement.src = "";
+				this.childConf.videoElement.srcObject = null;
+			} catch (_) {}
 			this.inst.attachMedia(this.childConf.videoElement);
-			this.inst.on(Hls.Events.ERROR, this.onError);
 		} catch (err) {
 			this.handleError(err);
 		}
@@ -39,6 +64,10 @@ export class HLSReader extends GenericReader {
 	public close() {
 		super.close();
 
+		this.childConf.videoElement.removeEventListener(
+			"play",
+			this.onPlayListener,
+		);
 		this.inst?.destroy();
 	}
 
@@ -46,9 +75,26 @@ export class HLSReader extends GenericReader {
 		return Hls.isSupported();
 	}
 
+	private onPlayListener = () => {
+		clearTimeout(this.loadTimer);
+		if (typeof this.inst?.liveSyncPosition === "number")
+			this.childConf.videoElement.currentTime =
+				this.inst.liveSyncPosition;
+	};
+
 	private onError(e: typeof Hls.Events.ERROR, data: ErrorData) {
 		if (data.fatal) {
 			this.handleError(new Error(`${data.details}`));
+		} else {
+			switch (data.type) {
+				case ErrorTypes.NETWORK_ERROR:
+					if (data.networkDetails.status >= 400) {
+						this.handleError(new Error(`Stream unavailable`));
+					}
+					break;
+				default:
+					break;
+			}
 		}
 		console.error(e, data);
 	}

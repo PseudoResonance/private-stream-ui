@@ -25,6 +25,7 @@ import { classMap } from "lit/directives/class-map.js";
 export class StreamPlayer extends LitElement {
 	private static _retryTimeout = 2000;
 	private static _statsTimeout = 10000;
+	private static _videoErrorTimeout = 4000;
 
 	constructor() {
 		super();
@@ -86,6 +87,8 @@ export class StreamPlayer extends LitElement {
 	private _statsTimer: NodeJS.Timeout | undefined = undefined;
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
+
+	private _videoErrorTimer: NodeJS.Timeout | undefined = undefined;
 
 	private _setErrorMessage = (msg: string) => {
 		this._errorMessage = html`${msg}<br />Retrying in
@@ -240,6 +243,27 @@ export class StreamPlayer extends LitElement {
 				this._videoInitState = PlayerState.READY;
 				this._errorMessage = "";
 			}}"
+			@waiting="${(e: Event) => {
+				clearTimeout(this._videoErrorTimer);
+				this._videoErrorTimer = setTimeout(() => {
+					try {
+						clearTimeout(this._videoErrorTimer);
+						this._videoErrorTimer = undefined;
+						console.error("Video stalled, assuming failed");
+						this._setErrorMessage("Stream Unavailable");
+						this._setupPlayer();
+					} catch (e) {
+						console.error(e);
+					}
+				}, StreamPlayer._videoErrorTimeout);
+			}}"
+			@playing="${() => {
+				clearTimeout(this._videoErrorTimer);
+				if (this._videoErrorTimer !== undefined) {
+					console.log("Video playback resuming");
+				}
+				this._videoErrorTimer = undefined;
+			}}"
 		></video>`;
 	}
 
@@ -365,17 +389,38 @@ export class StreamPlayer extends LitElement {
 		return html`
 			<media-controller>
 				${this.videoTemplate()} ${this.settingsTemplate()}
-				<media-control-bar
-					aria-disabled=${this._errorMessage ? true : false}
-					style="${this._errorMessage ? "display: none;" : ""}"
-				>
-					<media-play-button></media-play-button>
+				<media-control-bar>
+					<media-play-button
+						aria-disabled=${this._errorMessage ? true : false}
+						disabled="${this._errorMessage ? true : false}"
+						style="${this._errorMessage
+							? "pointer-events:none;touch-action:none;"
+							: ""}"
+					></media-play-button>
 					<media-mute-button></media-mute-button>
 					<media-volume-range></media-volume-range>
 					<div class="spacer"></div>
-					<media-cast-button></media-cast-button>
-					<media-airplay-button></media-airplay-button>
-					<media-pip-button></media-pip-button>
+					<media-cast-button
+						aria-disabled=${this._errorMessage ? true : false}
+						disabled="${this._errorMessage ? true : false}"
+						style="${this._errorMessage
+							? "pointer-events:none;touch-action:none;"
+							: ""}"
+					></media-cast-button>
+					<media-airplay-button
+						aria-disabled=${this._errorMessage ? true : false}
+						disabled="${this._errorMessage ? true : false}"
+						style="${this._errorMessage
+							? "pointer-events:none;touch-action:none;"
+							: ""}"
+					></media-airplay-button>
+					<media-pip-button
+						aria-disabled=${this._errorMessage ? true : false}
+						disabled="${this._errorMessage ? true : false}"
+						style="${this._errorMessage
+							? "pointer-events:none;touch-action:none;"
+							: ""}"
+					></media-pip-button>
 					<media-settings-menu-button></media-settings-menu-button>
 					<media-fullscreen-button></media-fullscreen-button>
 				</media-control-bar>
