@@ -43,7 +43,7 @@ securityContext:
 config:
   playerTitle: Live Video Player
   playerDescription: Video player frontend for MediaMTX
-  themeColor: red
+  themeColor: "#FF0000"
   providerBase: https://localhost
   thumbnailHttpsPort: 443
   thumbnailFormat: "webp"
