@@ -3,14 +3,22 @@ import { hideBin } from "yargs/helpers";
 import fs from "node:fs";
 
 export interface ConfigOptions {
+	playerTitle?: string;
+	playerDescription?: string;
+	themeColor?: string;
 	httpPort: number;
 	providerBase: string;
+	thumbnailHttpsPort?: number;
+	thumbnailFormat?: string;
 	webRtcPort?: number;
 	hlsPort?: number;
 }
 
 export default class Config {
 	public options: ConfigOptions = {
+		playerTitle: "Live Video Player",
+		playerDescription: "Video player frontend for MediaMTX",
+		themeColor: "red",
 		httpPort: 8080,
 		providerBase: "https://localhost",
 	};
@@ -77,8 +85,23 @@ export default class Config {
 		}
 
 		// Handle config options
+		if ("playerTitle" in configFile) {
+			this.options.playerTitle = configFile.playerTitle;
+		}
+		if ("playerDescription" in configFile) {
+			this.options.playerDescription = configFile.playerDescription;
+		}
+		if ("themeColor" in configFile) {
+			this.options.themeColor = configFile.themeColor;
+		}
 		if ("providerBase" in configFile) {
 			this.options.providerBase = configFile.providerBase;
+		}
+		if ("thumbnailHttpsPort" in configFile) {
+			this.options.thumbnailHttpsPort = configFile.thumbnailHttpsPort;
+		}
+		if ("thumbnailFormat" in configFile) {
+			this.options.thumbnailFormat = configFile.thumbnailFormat;
 		}
 		if ("webRtcPort" in configFile) {
 			this.options.webRtcPort = configFile.webRtcPort;

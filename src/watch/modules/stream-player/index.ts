@@ -234,6 +234,7 @@ export class StreamPlayer extends LitElement {
 			id="html-player"
 			class="${this._videoInitState}"
 			controlslist="nodownload"
+			poster="${(window as any).REMOTE_CONFIG?.thumbnailUrl ?? ""}"
 			@loadeddata="${(e: Event) => {
 				this._videoResolution = {
 					x: (e.composedPath()[0] as HTMLVideoElement).videoWidth,
@@ -243,7 +244,7 @@ export class StreamPlayer extends LitElement {
 				this._videoInitState = PlayerState.READY;
 				this._errorMessage = "";
 			}}"
-			@waiting="${(e: Event) => {
+			@waiting="${(_: Event) => {
 				clearTimeout(this._videoErrorTimer);
 				this._videoErrorTimer = setTimeout(() => {
 					try {

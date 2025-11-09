@@ -41,7 +41,12 @@ securityContext:
 
 # This is for supplying the configuration file.
 config:
+  playerTitle: Live Video Player
+  playerDescription: Video player frontend for MediaMTX
+  themeColor: red
   providerBase: https://localhost
+  thumbnailHttpsPort: 443
+  thumbnailFormat: "webp"
   webRtcPort: 9090
   hlsPort: 9191
 

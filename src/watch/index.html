@@ -4,16 +4,28 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link href="./index.css" rel="stylesheet" />
-		<title>Video Player</title>
-		<meta
-			name="description"
-			content="Video player for private streaming provider"
-		/>
-		<noscript>JavaScript must be enabled to view this stream!</noscript>
+		<!-- HEAD-META-TEMPLATE -->
 		<script type="module" src="./modules/stream-player/index.ts"></script>
 	</head>
 	<body>
 		<div id="content">
+			<noscript>
+				<div id="noscript">
+					JavaScript must be enabled to view this stream!
+				</div>
+				<style>
+					#noscript {
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100svw;
+						height: 100svh;
+						background-color: black;
+						color: white;
+						font-size: xx-large;
+					}
+				</style>
+			</noscript>
 			<stream-player></stream-player>
 		</div>
 	</body>

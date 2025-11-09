@@ -1,5 +1,5 @@
-export interface ApiUrlData {
-	base: string;
-	webRtcPort?: number;
-	hlsPort?: number;
+export interface BackendConfig {
+	thumbnailUrl?: string;
+	webRtcUrl?: string;
+	hlsUrl?: string;
 }

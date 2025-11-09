@@ -7,7 +7,8 @@ RUN bun run build
 
 FROM oven/bun:slim
 WORKDIR /opt
-COPY --from=builder /opt/dist/ ./
+COPY --from=builder /opt/dist/ ./dist/
+COPY --from=builder /opt/src/ ./src/
 
 ENV NODE_ENV=production
-ENTRYPOINT ["bun", "index.js"]
+ENTRYPOINT ["bun", "run", "./src/index.ts"]

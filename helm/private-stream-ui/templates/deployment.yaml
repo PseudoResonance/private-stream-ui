@@ -37,7 +37,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 8080
               protocol: TCP
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
@@ -54,10 +54,10 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
+            - name: NODE_ENV
+              value: production
             - name: CONFIG_PATH
               value: "/config.yml"
-            - name: HTTP_PORT
-              value: "{{ .Values.service.port }}"
       volumes:
         - name: config
           configMap:
