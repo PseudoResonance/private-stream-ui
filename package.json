@@ -1,6 +1,6 @@
 {
 	"name": "private-stream-ui",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "A convenient web UI to act as a frontend for MediaMTX.",
 	"author": "PseudoResonance",
 	"main": "./src/index.ts",
@@ -9,6 +9,7 @@
 		"dev": "bun run ./src/index.ts",
 		"prod": "NODE_ENV=production bun run ./src/index.ts",
 		"build": "vite build --outDir ../dist src",
+		"bundle": "bun build --target=bun --external 'vite' --production --outdir=bundle ./src/index.ts",
 		"test": "bun test"
 	},
 	"exports": {
@@ -21,8 +22,7 @@
 		"lit": "^3.3.1",
 		"media-chrome": "^4.15.1",
 		"vite-express": "^0.21.1",
-		"yargs": "^18.0.0",
-		"vite": "npm:rolldown-vite@7.1.14"
+		"yargs": "^18.0.0"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.3.0",
@@ -32,15 +32,16 @@
 		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.0.2",
 		"eslint-plugin-jsdoc": "^61.1.12",
+		"eslint-plugin-lit": "^2.1.1",
 		"eslint-plugin-perfectionist": "^4.10.1",
 		"eslint-plugin-prettier": "^5.2.5",
 		"eslint-plugin-sort-keys-fix": "^1.1.2",
 		"eslint-plugin-typescript-sort-keys": "^3.3.0",
-		"eslint-plugin-lit": "^2.1.1",
 		"prettier": "^3.5.3",
 		"prettier-eslint": "^16.4.1",
 		"typescript": "^5.8.2",
-		"typescript-eslint": "^8.46.3"
+		"typescript-eslint": "^8.46.3",
+		"vite": "npm:rolldown-vite@7.1.14"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@7.1.14"
