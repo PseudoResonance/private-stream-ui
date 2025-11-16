@@ -134,3 +134,4 @@ graphql_schema.json
 .graphql_ppx_cache
 
 config.json
+config.env

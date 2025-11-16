@@ -9,6 +9,8 @@ node_modules/*
 .prettierrc.json
 config.default.json
 config.json
+config.default.env
+config.env
 docker-compose.yaml
 Dockerfile
 eslint.config.mjs

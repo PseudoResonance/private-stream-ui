@@ -6,13 +6,13 @@
 		<link href="../global.css" rel="stylesheet" />
 		<link href="./index.css" rel="stylesheet" />
 		<!-- HEAD-META-TEMPLATE -->
-		<script type="module" src="./modules/stream-player/index.ts"></script>
+		<script type="module" src="./modules/panel/index.ts"></script>
 	</head>
 	<body>
-		<div id="content">
+		<div id="root-content">
 			<noscript>
 				<div id="noscript">
-					JavaScript must be enabled to view this stream!
+					JavaScript must be enabled to use this panel!
 				</div>
 				<style>
 					#noscript {
@@ -27,7 +27,7 @@
 					}
 				</style>
 			</noscript>
-			<stream-player></stream-player>
+			<management-panel></management-panel>
 		</div>
 	</body>
 </html>

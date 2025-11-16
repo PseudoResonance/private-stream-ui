@@ -64,3 +64,79 @@ Get the container image
     {{- end }}
   {{- end }}
 {{- end -}}
+
+{{/*
+Should generate database secret
+*/}}
+{{- define "private-stream-ui.generateSecretDb" }}
+{{- and (not .Values.databaseConfig.auth.existingSecret) (.Values.databaseConfig.auth.enabled) }}
+{{- end -}}
+
+{{/*
+Database secret name
+*/}}
+{{- define "private-stream-ui.secretNameDb" }}
+{{- if eq (include "private-stream-ui.generateSecretDb" .) "true" }}
+  {{- include "private-stream-ui.fullname" . }}-creds
+{{- else }}
+  {{- .Values.databaseConfig.auth.existingSecret }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Check if a pregenerated secret already exists
+*/}}
+{{- define "private-stream-ui.remoteSecretDb" }}
+  {{- if and .Values.databaseConfig.auth.enabled (not .Values.databaseConfig.auth.existingSecret) (not .Values.databaseConfig.auth.password) }}
+    {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace (include "private-stream-ui.secretNameDb" .)) | default dict }}
+    {{- $secretData := (get $secretObj "data") | default dict }}
+    {{- (get $secretData .Values.databaseConfig.auth.passwordKey) | default (randAlphaNum 100 | b64enc) }}
+  {{- end }}
+{{- end -}}
+
+{{/*
+Should generate OIDC primary secret
+*/}}
+{{- define "private-stream-ui.generateSecretOidcPrimary" }}
+{{- and (not .Values.oidc.existingSecret) (.Values.oidc.enabled) }}
+{{- end -}}
+
+{{/*
+OIDC primary secret name
+*/}}
+{{- define "private-stream-ui.secretNameOidcPrimary" }}
+{{- if eq (include "private-stream-ui.generateSecretOidcPrimary" .) "true" }}
+  {{- include "private-stream-ui.fullname" . }}-oidc
+{{- else }}
+  {{- .Values.oidc.existingSecret }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Should generate OIDC secret
+*/}}
+{{- define "private-stream-ui.generateSecretOidc" }}
+{{- and (not .Values.oidc.localSecret.existingSecret) (.Values.oidc.enabled) }}
+{{- end -}}
+
+{{/*
+OIDC secret name
+*/}}
+{{- define "private-stream-ui.secretNameOidc" }}
+{{- if eq (include "private-stream-ui.generateSecretOidc" .) "true" }}
+  {{- include "private-stream-ui.fullname" . }}-oidc-secret
+{{- else }}
+  {{- .Values.oidc.localSecret.existingSecret }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Check if a pregenerated OIDC secret already exists
+*/}}
+{{- define "private-stream-ui.remoteSecretOidc" }}
+  {{- if and .Values.oidc.enabled (not .Values.oidc.localSecret.existingSecret) (not .Values.oidc.localSecret.value) }}
+    {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace (include "private-stream-ui.secretNameOidc" .)) | default dict }}
+    {{- $secretData := (get $secretObj "data") | default dict }}
+    {{- (get $secretData .Values.oidc.localSecret.secretGeneratedKey) | default (randAlphaNum 100 | b64enc) }}
+  {{- end }}
+{{- end -}}

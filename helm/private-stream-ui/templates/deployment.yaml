@@ -48,9 +48,15 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: config
-              mountPath: /config.yml
-              subPath: config.yml
+              mountPath: /config.json
+              subPath: config.json
               readOnly: true
+          {{- if .Values.oidc.enabled }}
+            - name: oidc
+              mountPath: {{ printf "/config.json.d/%s" .Values.oidc.secretKey }}
+              subPath: {{ .Values.oidc.secretKey }}
+              readOnly: true
+          {{- end }}
           {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -58,11 +64,55 @@ spec:
             - name: NODE_ENV
               value: production
             - name: CONFIG_PATH
-              value: "/config.yml"
+              value: "/config.json"
+            - name: DB_HOSTNAME
+              value: {{ .Values.databaseConfig.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.databaseConfig.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.databaseConfig.database | quote }}
+          {{- if .Values.databaseConfig.auth.enabled }}
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "private-stream-ui.secretNameDb" . | quote }}
+                  key: {{ .Values.databaseConfig.auth.usernameKey | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "private-stream-ui.secretNameDb" . | quote }}
+                  key: {{ .Values.databaseConfig.auth.passwordKey | quote }}
+          {{- end }}
+            - name: DB_MAX_CONNECTIONS
+              value: {{ .Values.databaseConfig.maxConnections | quote }}
+            - name: DB_IDLE_TIMEOUT
+              value: {{ .Values.databaseConfig.idleTimeout | quote }}
+            - name: DB_MAX_LIFETIME
+              value: {{ .Values.databaseConfig.maxLifetime | quote }}
+            - name: DB_CONNECTION_TIMEOUT
+              value: {{ .Values.databaseConfig.connectionTimeout | quote }}
+          {{- if .Values.oidc.enabled }}
+            - name: OIDC_SECRET_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "private-stream-ui.secretNameOidc" . | quote }}
+                  key: {{ .Values.oidc.localSecret.secretGeneratedKey | quote }}
+          {{- end }}
+          {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "private-stream-ui.fullname" . }}-config
+        {{- if .Values.oidc.enabled }}
+        - name: oidc
+          secret:
+            secretName: {{ include "private-stream-ui.secretNameOidcPrimary" . }}
+            items:
+              - key: {{ .Values.oidc.secretKey }}
+                path: {{ .Values.oidc.secretKey }}
+        {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

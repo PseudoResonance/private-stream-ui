@@ -317,8 +317,10 @@ export class StreamPlayer extends LitElement {
 			height: fit-content;
 			overflow: hidden;
 			user-select: none;
+			-webkit-touch-callout: none;
 			-webkit-user-select: none;
 			-ms-user-select: none;
+			-moz-user-select: none;
 			display: flex;
 			justify-content: center;
 		}
@@ -385,7 +387,6 @@ export class StreamPlayer extends LitElement {
 		}
 	`;
 
-	// src="https://44610fa9-3e30-4e16-b568-7529ed57cf0d.mdnplay.dev/shared-assets/videos/flower.webm"
 	render() {
 		return html`
 			<media-controller>

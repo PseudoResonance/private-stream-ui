@@ -9,6 +9,7 @@ export default defineConfig({
 		rollupOptions: {
 			input: {
 				main: resolve(__dirname, "index.html"),
+				management: resolve(__dirname, "management/index.html"),
 				watch: resolve(__dirname, "watch/index.html"),
 			},
 		},

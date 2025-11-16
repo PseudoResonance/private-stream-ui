@@ -44,11 +44,59 @@ config:
   playerTitle: Live Video Player
   playerDescription: Video player frontend for MediaMTX
   themeColor: "#FF0000"
-  providerBase: https://localhost
+  serverBaseUrl: https://live.localhost
+  providerBase: https://backend.localhost
   thumbnailHttpsPort: 443
   thumbnailFormat: "webp"
   webRtcPort: 9090
   hlsPort: 9191
+
+oidc:
+  enabled: false
+  existingSecret:
+  secretKey: auth.json
+  # If an existing secret is not specified, the following config can optionally be used
+  config:
+    # Enable if using Auth0 as the provider
+    auth0Logout: false
+    # The callback URL will be at /callback by default
+    baseURL: "https://example.com"
+    # Ensure there is no trailing slash
+    issuerBaseURL: "https://auth.example.com"
+    clientID: "CLIENT ID HERE"
+    clientSecret: "CLIENT SECRET HERE"
+  # Config for the "secret" string, a long, randomly generated string kept locally by the application
+  localSecret:
+    existingSecret:
+    # Key for the automatically generated secret
+    secretGeneratedKey: localSecret
+    # The value can be specified manually if an existing secret is not used
+    value: ""
+
+databaseConfig:
+  host: postgresql
+  port: 5432
+  database: stream
+  maxConnections: 5
+  idleTimeout: 60
+  maxLifetime: 0
+  connectionTimeout: 10
+  auth:
+    enabled: true
+    # A username/password can be provided directly here
+    # If no credentials are provided but auth is enabled, a password will be randomly generated
+    username: "stream"
+    password: ""
+    # Alternatively, an existing secret can be used to supply the credentials
+    existingSecret: ""
+    # The keys that stores the credentials
+    usernameKey: "username"
+    passwordKey: "password"
+
+# Pass extra environment variables to the pod
+extraEnv: []
+  # - name: SOME_ENV
+  #   value: "100"
 
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
 service:

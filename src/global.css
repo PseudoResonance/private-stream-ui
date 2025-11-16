@@ -1,0 +1,50 @@
+html,
+body {
+	font-family: "Arial", sans-serif;
+
+	--border-radius: 5px;
+
+	--transition-speed: 0.03s;
+	--transition-function: ease-in-out;
+}
+@media (prefers-color-scheme: dark) {
+	body {
+		--bg-primary-color: rgb(40, 40, 40);
+		--fg-primary-color: rgb(230, 230, 230);
+		--bg-secondary-color: rgb(20, 20, 20);
+		--bg-secondary-color-hover: rgb(50, 50, 50);
+
+		--bg-ok-color: rgb(17, 87, 17);
+		--bg-ok-color-hover: rgb(13, 138, 13);
+		--fg-ok-color: rgb(40, 40, 40);
+
+		--bg-danger-color: rgb(155, 15, 15);
+		--bg-danger-color-hover: rgb(221, 25, 25);
+		--fg-danger-color: rgb(40, 40, 40);
+	}
+}
+@media (prefers-color-scheme: light) {
+	body {
+		--bg-primary-color: rgb(255, 255, 255);
+		--fg-primary-color: rgb(0, 0, 0);
+		--bg-secondary-color: rgb(220, 220, 220);
+		--bg-secondary-color-hover: rgb(180, 180, 180);
+
+		--bg-ok-color: rgb(16, 194, 16);
+		--bg-ok-color-hover: rgb(112, 238, 112);
+		--fg-ok-color: rgb(0, 0, 0);
+
+		--bg-danger-color: rgb(200, 29, 29);
+		--bg-danger-color-hover: rgb(255, 94, 94);
+		--fg-danger-color: rgb(0, 0, 0);
+	}
+}
+@font-face {
+	font-family: "Google Sans Code";
+	src: url("/GoogleSansCode-VariableFont_wght.ttf") format("woff2");
+}
+@font-face {
+	font-family: "Google Sans Code";
+	src: url("/GoogleSansCode-Italic-VariableFont_wght.ttf") format("woff2");
+	font-style: italic;
+}

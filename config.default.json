@@ -1,10 +1,22 @@
 {
 	"playerTitle": "Live Video Player",
 	"playerDescription": "Video player frontend for MediaMTX",
+	"serverBaseUrl": "http://localhost",
 	"themeColor": "#FF0000",
 	"providerBase": "https://localhost",
 	"thumbnailHttpsPort": 443,
 	"thumbnailFormat": "webp",
-	"webRtcPort": 9090,
-	"hlsPort": 9191
+	"webRtcPort": 8889,
+	"hlsPort": 8888,
+	"auth": null,
+	"maxTokens": 1,
+	"maxPaths": 3,
+	"publishProtocols": {
+		"srt": 8890,
+		"webrtcSecure": 8889,
+		"rtsp": 8554,
+		"rtsps": 8322,
+		"rtmp": 1935,
+		"rtmps": 1936
+	}
 }
