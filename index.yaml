@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   private-stream-ui:
   - apiVersion: v2
+    appVersion: 1.2.0
+    created: "2025-11-16T10:53:06.680633995Z"
+    description: Deploys a private streaming UI for MediaMTX.
+    digest: c07341c430659be7471011bd75cb5184639c19c1b08eda44eaed9c499157f0bc
+    name: private-stream-ui
+    type: application
+    urls:
+    - https://github.com/PseudoResonance/private-stream-ui/releases/download/private-stream-ui-1.0.6/private-stream-ui-1.0.6.tgz
+    version: 1.0.6
+  - apiVersion: v2
     appVersion: 1.1.1
     created: "2025-11-09T22:33:58.448920225Z"
     description: Deploys a private streaming UI for MediaMTX.
@@ -51,4 +61,4 @@ entries:
     urls:
     - https://github.com/PseudoResonance/private-stream-ui/releases/download/private-stream-ui-1.0.1/private-stream-ui-1.0.1.tgz
     version: 1.0.1
-generated: "2025-11-09T22:33:58.448949519Z"
+generated: "2025-11-16T10:53:06.680662889Z"
