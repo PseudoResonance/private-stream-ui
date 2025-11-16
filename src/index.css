@@ -5,4 +5,14 @@ body {
 	width: 100svw;
 	margin: 0;
 	padding: 0;
+
+	--header-size: 1cm;
+	--header-button-padding: 0.3cm;
+	--header-font-size: x-large;
+
+	--padding: 0.3cm;
+}
+body {
+	background-color: var(--bg-primary-color);
+	color: var(--fg-primary-color);
 }

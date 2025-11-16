@@ -135,6 +135,15 @@ ViteExpress.config({
 				<meta property="og:description" content="${config.options.playerDescription}" />
 				<meta property="og:title" content="${config.options.playerTitle}" />
                 <meta name="theme-color" content="${config.options.themeColor}">
+                ${
+					config.options.auth
+						? `
+                <script>
+                    window.USER_DATA = ${JSON.stringify(userData)};
+                </script>
+                `
+						: ""
+				}
 			`,
 			);
 		}

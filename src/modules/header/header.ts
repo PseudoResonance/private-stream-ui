@@ -1,8 +1,8 @@
 import { html, css, LitElement } from "lit";
 import { customElement } from "lit/decorators.js";
 
-@customElement("management-panel-header")
-export class ManagementPanelHeader extends LitElement {
+@customElement("page-panel-header")
+export class PagePanelHeader extends LitElement {
 	public static slotButtons = "buttons";
 
 	constructor() {
@@ -13,13 +13,15 @@ export class ManagementPanelHeader extends LitElement {
 		:host {
 			position: relative;
 			font-size: var(--header-font-size);
-			align-items: stretch;
 			background-color: var(--bg-secondary-color);
 			user-select: none;
 			-webkit-touch-callout: none;
 			-webkit-user-select: none;
 			-ms-user-select: none;
 			-moz-user-select: none;
+		}
+		.wrapper {
+			align-items: stretch;
 		}
 		#buttons {
 			position: absolute;
@@ -30,17 +32,14 @@ export class ManagementPanelHeader extends LitElement {
 	`;
 
 	render() {
-		return html`<div>
-			<slot
-				id="buttons"
-				name="${ManagementPanelHeader.slotButtons}"
-			></slot>
+		return html`<div class="wrapper">
+			<slot id="buttons" name="${PagePanelHeader.slotButtons}"></slot>
 		</div>`;
 	}
 }
 
 declare global {
-	interface HTMLElementManagementPanelHeader {
-		"management-panel-header": ManagementPanelHeader;
+	interface HTMLElementPagePanelHeader {
+		"page-panel-header": PagePanelHeader;
 	}
 }

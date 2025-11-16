@@ -1,8 +1,8 @@
 import { html, css, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-import "./header";
-import "./content";
+import "../../../modules/header";
+import "../../../modules/content";
 import "./table";
 import "./path-config";
 import type { ManagementData, UserData } from "../../../types";
@@ -37,7 +37,7 @@ export class ManagementPanel extends LitElement {
 			grid-template:
 				[header-start] "header header" var(--header-size) [header-end]
 				[content-start] "content content" auto [content-end]
-				/ 10cm auto;
+				/ auto;
 		}
 		#header {
 			grid-area: header;
@@ -182,8 +182,8 @@ export class ManagementPanel extends LitElement {
 	}
 
 	render() {
-		const userData = (window as any).USER_DATA as UserData;
-		return html`<management-panel-header id="header">
+		const userData = (window as any).USER_DATA as UserData | undefined;
+		return html`<page-panel-header id="header">
 				<header-button href="/">Home</header-button>
 				<header-button
 					@click="${() => {
@@ -208,14 +208,14 @@ export class ManagementPanel extends LitElement {
 				</header-button>
 				<header-separator></header-separator>
 				<header-text>
-					${userData.name ??
-					userData.username ??
-					(userData.admin ? "Admin" : "User")}
+					${userData?.name ??
+					userData?.username ??
+					(userData?.admin ? "Admin" : "User")}
 				</header-text>
-			</management-panel-header>
-			<management-panel-content id="content">
+			</page-panel-header>
+			<page-panel-content id="content">
 				${this.contentTemplates()}
-			</management-panel-content>`;
+			</page-panel-content>`;
 	}
 }
 

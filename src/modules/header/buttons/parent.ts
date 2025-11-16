@@ -1,6 +1,6 @@
 import { html, css, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { ManagementPanelHeader } from "../header";
+import { PagePanelHeader } from "../header";
 
 @customElement("header-button")
 export class HeaderButton extends LitElement {
@@ -15,7 +15,7 @@ export class HeaderButton extends LitElement {
 		super.connectedCallback();
 		// Allow overriding
 		if (this.getAttribute("slot") === null)
-			this.setAttribute("slot", ManagementPanelHeader.slotButtons);
+			this.setAttribute("slot", PagePanelHeader.slotButtons);
 		this.addEventListener("click", () => {
 			if (this.href.length > 0) window.location.href = this.href;
 		});

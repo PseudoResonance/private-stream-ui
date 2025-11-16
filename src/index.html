@@ -6,8 +6,28 @@
 		<link href="./global.css" rel="stylesheet" />
 		<link href="./index.css" rel="stylesheet" />
 		<!-- HEAD-META-TEMPLATE -->
+		<script type="module" src="./modules/home/index.ts"></script>
 	</head>
 	<body>
-		<h1>Media</h1>
+		<div id="root-content">
+			<noscript>
+				<div id="noscript">
+					JavaScript must be enabled to use this website!
+				</div>
+				<style>
+					#noscript {
+						position: absolute;
+						top: 0;
+						left: 0;
+						width: 100svw;
+						height: 100svh;
+						background-color: black;
+						color: white;
+						font-size: xx-large;
+					}
+				</style>
+			</noscript>
+			<home-panel></home-panel>
+		</div>
 	</body>
 </html>

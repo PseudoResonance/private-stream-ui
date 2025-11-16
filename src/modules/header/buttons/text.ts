@@ -1,6 +1,6 @@
 import { css, html, LitElement } from "lit";
 import { customElement } from "lit/decorators.js";
-import { ManagementPanelHeader } from "../header";
+import { PagePanelHeader } from "../header";
 
 @customElement("header-text")
 export class HeaderText extends LitElement {
@@ -12,7 +12,7 @@ export class HeaderText extends LitElement {
 		super.connectedCallback();
 		// Allow overriding
 		if (this.getAttribute("slot") === null)
-			this.setAttribute("slot", ManagementPanelHeader.slotButtons);
+			this.setAttribute("slot", PagePanelHeader.slotButtons);
 	}
 
 	static styles = css`

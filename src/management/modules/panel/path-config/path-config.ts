@@ -98,191 +98,211 @@ export class PathConfig extends LitElement {
 		}
 		:host {
 			display: flex;
-			flex-wrap: wrap;
-			justify-content: center;
-			align-content: flex-start;
+			flex-direction: column;
 			gap: 1cm;
 		}
-		.primary {
+		.wrapper {
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 1cm;
+		}
+		.primary,
+		.sidebar {
 			display: flex;
 			flex-direction: column;
 		}
 		.sidebar {
+			// width: 100%;
 		}
 	`;
 
 	render() {
-		return html`<div class="primary">
-				<h3>Stream ${this.id}</h3>
-				<grid-table
-					.columns="${[
-						{
-							name: "Type",
-							key: "action",
-							size: "auto",
-							transform: (val: string) => {
-								if (val === "read") return "Read";
-								else if (val === "publish") return "Publish";
-								else return val;
+		return html`<h3>
+				Stream
+				<span
+					style='font-family:"Google Sans Code", "Lucida Console", "Courier New", monospace'
+					>${this.id}</span
+				>
+			</h3>
+			<div class="wrapper">
+				<div class="primary">
+					<grid-table
+						.columns="${[
+							{
+								name: "Type",
+								key: "action",
+								size: "auto",
+								transform: (val: string) => {
+									if (val === "read") return "Read";
+									else if (val === "publish")
+										return "Publish";
+									else return val;
+								},
 							},
-						},
-						{
-							name: "Token",
-							key: "querytoken",
-							size: "auto",
-							transform: (val: string) => {
-								return val.slice(0, 5) + "..." + val.slice(-5);
+							{
+								name: "Token",
+								key: "querytoken",
+								size: "auto",
+								style: `font-family:"Google Sans Code", "Lucida Console", "Courier New", monospace`,
+								transform: (val: string) => {
+									return (
+										val.slice(0, 5) + "..." + val.slice(-5)
+									);
+								},
 							},
-						},
-						{
-							name: "Copy",
-							style: `padding: 0`,
-							generate: (row: Record<string, unknown>) => {
-								if (row.action === "read") {
+							{
+								name: "Copy",
+								style: `padding: 0`,
+								generate: (row: Record<string, unknown>) => {
+									if (row.action === "read") {
+										return html`
+											<table-button
+												@click="${() => {
+													const watchUrl = new URL(
+														this.baseUrl +
+															"/watch/" +
+															this.id +
+															"?t=" +
+															row.querytoken,
+													).toString();
+													navigator.clipboard.writeText(
+														watchUrl,
+													);
+												}}"
+												style="--bg-color: var(--bg-ok-color); --bg-color-hover: var(--bg-ok-color-hover); --fg-color: var(--fg-ok-color);"
+											>
+												Copy Watch URL
+											</table-button>
+										`;
+									}
+									return html``;
+								},
+								size: "auto",
+							},
+							{
+								name: "Regenerate",
+								style: `padding: 0`,
+								generate: (row: Record<string, unknown>) => {
+									return html`
+										<table-button
+											@click="${async () => {
+												const deleteRes = await fetch(
+													`/api/v1/token/delete`,
+													{
+														method: "POST",
+														headers: {
+															"Content-Type":
+																"application/json; charset=utf-8",
+														},
+														body: JSON.stringify({
+															path: this.id,
+															tokens: [row],
+														}),
+													},
+												);
+												if (deleteRes.status !== 200) {
+													throw new Error(
+														`${deleteRes.status}: ${deleteRes.statusText} when deleting stream token!\n${deleteRes}`,
+													);
+												}
+												const tokenData = await fetch(
+													"/api/v1/privatetoken",
+													{
+														method: "POST",
+														headers: {
+															"Content-Type":
+																"application/json; charset=utf-8",
+														},
+														body: JSON.stringify({
+															path: this.id,
+															action: row.action,
+														}),
+													},
+												);
+												if (tokenData.status !== 200) {
+													throw new Error(
+														`${tokenData.status}: ${tokenData.statusText} when creating stream token!\n${tokenData}`,
+													);
+												}
+												this.fetchTokens();
+											}}"
+											style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color);"
+										>
+											Regenerate Key
+										</table-button>
+									`;
+								},
+								size: "auto",
+							},
+						]}"
+						.data="${this.tokens}"
+						tableTitle="Access Tokens"
+						showHeader
+						showTitle
+					>
+						<table-button
+							@click="${async () => {
+								const deleteRes = await fetch(
+									`/api/v1/path?paths=${this.id}`,
+									{
+										method: "DELETE",
+									},
+								);
+								if (deleteRes.status !== 200) {
+									throw new Error(
+										`${deleteRes.status}: ${deleteRes.statusText} when deleting stream path!\n${deleteRes}`,
+									);
+								} else {
+									// A strange hack to parse the pathname a bit more accurately...
+									window.location.href = new URL(
+										window.location.pathname + "/../",
+										"http://localhost",
+									).pathname;
+								}
+							}}"
+							style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color);"
+						>
+							Delete
+						</table-button>
+					</grid-table>
+				</div>
+				<div class="sidebar">
+					<grid-table
+						.columns="${[
+							{
+								name: "Type",
+								key: "type",
+								size: "auto",
+							},
+							{
+								name: "Copy",
+								key: "url",
+								style: `padding: 0`,
+								transform: (url: string) => {
 									return html`
 										<table-button
 											@click="${() => {
-												const watchUrl = new URL(
-													this.baseUrl +
-														"/watch/" +
-														this.id +
-														"?t=" +
-														row.querytoken,
-												).toString();
 												navigator.clipboard.writeText(
-													watchUrl,
+													url,
 												);
 											}}"
 											style="--bg-color: var(--bg-ok-color); --bg-color-hover: var(--bg-ok-color-hover); --fg-color: var(--fg-ok-color);"
 										>
-											Copy Watch URL
+											Copy URL
 										</table-button>
 									`;
-								}
-								return html``;
-							},
-							size: "auto",
-						},
-						{
-							name: "Regenerate",
-							style: `padding: 0`,
-							generate: (row: Record<string, unknown>) => {
-								return html`
-									<table-button
-										@click="${async () => {
-											const deleteRes = await fetch(
-												`/api/v1/token/delete`,
-												{
-													method: "POST",
-													headers: {
-														"Content-Type":
-															"application/json; charset=utf-8",
-													},
-													body: JSON.stringify({
-														path: this.id,
-														tokens: [row],
-													}),
-												},
-											);
-											if (deleteRes.status !== 200) {
-												throw new Error(
-													`${deleteRes.status}: ${deleteRes.statusText} when deleting stream token!\n${deleteRes}`,
-												);
-											}
-											const tokenData = await fetch(
-												"/api/v1/privatetoken",
-												{
-													method: "POST",
-													headers: {
-														"Content-Type":
-															"application/json; charset=utf-8",
-													},
-													body: JSON.stringify({
-														path: this.id,
-														action: row.action,
-													}),
-												},
-											);
-											if (tokenData.status !== 200) {
-												throw new Error(
-													`${tokenData.status}: ${tokenData.statusText} when creating stream token!\n${tokenData}`,
-												);
-											}
-											this.fetchTokens();
-										}}"
-										style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color);"
-									>
-										Regenerate Key
-									</table-button>
-								`;
-							},
-							size: "auto",
-						},
-					]}"
-					.data="${this.tokens}"
-					tableTitle="Access Tokens"
-					showHeader
-					showTitle
-				>
-					<table-button
-						@click="${async () => {
-							const deleteRes = await fetch(
-								`/api/v1/path?paths=${this.id}`,
-								{
-									method: "DELETE",
 								},
-							);
-							if (deleteRes.status !== 200) {
-								throw new Error(
-									`${deleteRes.status}: ${deleteRes.statusText} when deleting stream path!\n${deleteRes}`,
-								);
-							} else {
-								// A strange hack to parse the pathname a bit more accurately...
-								window.location.href = new URL(
-									window.location.pathname + "/../",
-									"http://localhost",
-								).pathname;
-							}
-						}}"
-						style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color);"
-					>
-						Delete
-					</table-button>
-				</grid-table>
-			</div>
-			<div class="sidebar">
-				<grid-table
-					.columns="${[
-						{
-							name: "Type",
-							key: "type",
-							size: "auto",
-						},
-						{
-							name: "Copy",
-							key: "url",
-							style: `padding: 0`,
-							transform: (url: string) => {
-								return html`
-									<table-button
-										@click="${() => {
-											navigator.clipboard.writeText(url);
-										}}"
-										style="--bg-color: var(--bg-ok-color); --bg-color-hover: var(--bg-ok-color-hover); --fg-color: var(--fg-ok-color);"
-									>
-										Copy URL
-									</table-button>
-								`;
+								size: "auto",
 							},
-							size: "auto",
-						},
-					]}"
-					.data="${this.publishUrls}"
-					tableTitle="Publish URLs"
-					showHeader
-					showTitle
-				>
-				</grid-table>
+						]}"
+						.data="${this.publishUrls}"
+						tableTitle="Publish URLs"
+						showTitle
+					>
+					</grid-table>
+				</div>
 			</div>`;
 	}
 }

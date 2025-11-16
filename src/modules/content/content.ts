@@ -1,8 +1,8 @@
 import { html, css, LitElement } from "lit";
 import { customElement } from "lit/decorators.js";
 
-@customElement("management-panel-content")
-export class ManagementPanelContent extends LitElement {
+@customElement("page-panel-content")
+export class PagePanelContent extends LitElement {
 	constructor() {
 		super();
 	}
@@ -27,7 +27,7 @@ export class ManagementPanelContent extends LitElement {
 }
 
 declare global {
-	interface HTMLElementManagementPanelContent {
-		"management-panel-content": ManagementPanelContent;
+	interface HTMLElementPagePanelContent {
+		"page-panel-content": PagePanelContent;
 	}
 }
