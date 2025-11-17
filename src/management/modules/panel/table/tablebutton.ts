@@ -52,6 +52,7 @@ export class TableButton extends LitElement {
 			height: 100%;
 			transition: background-color var(--transition-speed)
 				var(--transition-function);
+			cursor: pointer;
 		}
 		button::-moz-focus-inner {
 			border: 0;

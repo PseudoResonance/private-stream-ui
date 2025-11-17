@@ -31,6 +31,12 @@ export class PathConfig extends LitElement {
 	@state()
 	private publishUrls: { type: string; url: string }[] = [];
 
+	@state()
+	private previewUrl: string = "";
+
+	@state()
+	private previewActive: boolean = false;
+
 	private async fetchTokens() {
 		if (this.id.length === 0) {
 			return;
@@ -55,12 +61,27 @@ export class PathConfig extends LitElement {
 			}
 			return 0;
 		});
+		let gotPublish = false;
+		let gotRead = false;
 		this.tokens.find((token) => {
-			if (token.action === "publish") {
+			if (token.action === "publish" && !gotPublish) {
 				this.constructPublishUrls(this.id, token.querytoken as string);
+				gotPublish = true;
+			} else if (token.action === "read" && !gotRead) {
+				this.previewUrl = this.constructWatchUrl(
+					this.id,
+					token.querytoken as string,
+				);
+				gotRead = true;
+			}
+			if (gotPublish && gotRead) {
 				return true;
 			}
 		});
+	}
+
+	private constructWatchUrl(id: string, token: string) {
+		return new URL(`${this.baseUrl}/watch/${id}?t=${token}`).toString();
 	}
 
 	private constructPublishUrls(id: string, token: string) {
@@ -113,10 +134,63 @@ export class PathConfig extends LitElement {
 			display: flex;
 			flex-direction: column;
 		}
-		.sidebar {
-			// width: 100%;
+		.streamPreviewPlaceholder {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			background-color: black;
+			color: white;
+			pointer-events: initial;
+			touch-action: initial;
+			border: none;
+			font-family: inherit;
+			font-size: x-large;
+			padding: 0;
+			margin: 0;
+			text-transform: none;
+			cursor: pointer;
+			border: solid thin var(--fg-primary-color);
+		}
+		.streamPreviewPlaceholder,
+		[type="button"],
+		[type="reset"],
+		[type="submit"] {
+			-webkit-appearance: button;
+		}
+		.streamPreview {
+			border: solid thin var(--fg-primary-color);
 		}
 	`;
+
+	private getPreviewTemplate() {
+		if (this.previewUrl.length > 0) {
+			if (this.previewActive) {
+				return html`<div class="sidebar">
+					<iframe
+						class="streamPreview"
+						title="Stream Preview"
+						width="300"
+						height="200"
+						src="${this.previewUrl}"
+					>
+					</iframe>
+				</div>`;
+			} else {
+				return html`<div class="sidebar">
+					<button
+						class="streamPreviewPlaceholder"
+						style="width:300px;height:200px;"
+						@click="${() => {
+							this.previewActive = true;
+						}}"
+					>
+						Click for Preview
+					</button>
+				</div>`;
+			}
+		}
+		return html``;
+	}
 
 	render() {
 		return html`<h3>
@@ -160,15 +234,11 @@ export class PathConfig extends LitElement {
 										return html`
 											<table-button
 												@click="${() => {
-													const watchUrl = new URL(
-														this.baseUrl +
-															"/watch/" +
-															this.id +
-															"?t=" +
-															row.querytoken,
-													).toString();
 													navigator.clipboard.writeText(
-														watchUrl,
+														this.constructWatchUrl(
+															this.id,
+															row.querytoken as string,
+														),
 													);
 												}}"
 												style="--bg-color: var(--bg-ok-color); --bg-color-hover: var(--bg-ok-color-hover); --fg-color: var(--fg-ok-color);"
@@ -303,6 +373,7 @@ export class PathConfig extends LitElement {
 					>
 					</grid-table>
 				</div>
+				${this.getPreviewTemplate()}
 			</div>`;
 	}
 }
