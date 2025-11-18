@@ -57,4 +57,8 @@ export abstract class GenericReader {
 	protected static unquoteCredential(v?: string): string {
 		return JSON.parse(`"${v ?? ""}"`);
 	}
+
+	public abstract play(): void;
+
+	public abstract pause(): void;
 }

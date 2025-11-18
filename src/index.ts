@@ -101,7 +101,11 @@ ViteExpress.config({
 				baseUrl: config.options.serverBaseUrl,
 				publishProtocols: config.options.publishProtocols,
 				providerBase: new URL(config.options.providerBase).hostname,
+				thumbnailUrlNoToken: "",
 			};
+			if (config.options.thumbnailHttpsPort) {
+				managementData.thumbnailUrlNoToken = `${config.options.providerBase}:${config.options.thumbnailHttpsPort}/thumbnails/${streamId}.${config.options.thumbnailFormat ?? "webp"}`;
+			}
 			return html.replace(
 				"<!-- HEAD-META-TEMPLATE -->",
 				`

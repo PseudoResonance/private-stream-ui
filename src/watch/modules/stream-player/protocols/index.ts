@@ -9,7 +9,7 @@ export enum StreamProtocol {
 	HLS = "hls",
 }
 
-const defaultProtocol = StreamProtocol.WebRTC_UDP;
+const defaultProtocol = StreamProtocol.HLS;
 
 export function streamProtocolFromString(
 	protocol: string | undefined | null,
@@ -154,6 +154,18 @@ export class StreamReader {
 	public close() {
 		if (this.reader) {
 			this.reader.close();
+		}
+	}
+
+	public play() {
+		if (this.reader) {
+			this.reader.play();
+		}
+	}
+
+	public pause() {
+		if (this.reader) {
+			this.reader.pause();
 		}
 	}
 }

@@ -1,4 +1,5 @@
 import { StreamProtocol } from "..";
+import { PlayerNotices } from "../../types";
 import { GenericReader, PlayerState, type ReaderConf } from "../interface";
 
 interface ICEServerList {
@@ -172,12 +173,11 @@ export class WebRTCReader extends GenericReader {
 		switch (res.status) {
 			case 201:
 				break;
-			case 404:
-				throw new Error("Stream Offline");
 			case 400:
-				return res.json().then((e) => {
-					throw new Error(e.error);
-				});
+			case 401:
+			case 403:
+			case 404:
+				throw new Error(PlayerNotices.OFFLINE);
 			default:
 				throw new Error(`Error ${res.status}`);
 		}
@@ -285,7 +285,7 @@ export class WebRTCReader extends GenericReader {
 					case 204:
 						break;
 					case 404:
-						throw new Error("Stream Offline");
+						throw new Error(PlayerNotices.OFFLINE);
 					default:
 						throw new Error(`Error ${res.status}`);
 				}
@@ -388,5 +388,13 @@ export class WebRTCReader extends GenericReader {
 		this.peerConnection?.getReceivers().forEach((rec) => {
 			rec.jitterBufferTarget = length;
 		});
+	}
+
+	public play() {
+		// Not implemented
+	}
+
+	public pause() {
+		// Not implemented
 	}
 }

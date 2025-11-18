@@ -1,5 +1,6 @@
 import Hls, { ErrorTypes, type ErrorData } from "hls.js";
 import { GenericReader, type ReaderConf } from "../interface";
+import { PlayerNotices } from "../../types";
 
 interface HLSReaderConf extends ReaderConf {
 	bufferLength: number | null;
@@ -30,7 +31,7 @@ export class HLSReader extends GenericReader {
 				this.inst?.loadSource(this.conf.url);
 				this.loadTimer = setTimeout(() => {
 					this.inst?.destroy();
-					this.handleError(new Error("Stream Offline"));
+					this.handleError(new Error(PlayerNotices.OFFLINE));
 				}, HLSReader.loadTimeout);
 			});
 			this.inst.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -39,7 +40,7 @@ export class HLSReader extends GenericReader {
 				this.childConf.videoElement.play();
 				this.loadTimer = setTimeout(() => {
 					this.inst?.destroy();
-					this.handleError(new Error("Stream Offline"));
+					this.handleError(new Error(PlayerNotices.OFFLINE));
 				}, HLSReader.loadTimeout);
 			});
 			this.childConf.videoElement.removeEventListener(
@@ -89,7 +90,7 @@ export class HLSReader extends GenericReader {
 			switch (data.type) {
 				case ErrorTypes.NETWORK_ERROR:
 					if (data.networkDetails.status >= 400) {
-						this.handleError(new Error(`Stream unavailable`));
+						this.handleError(new Error(PlayerNotices.OFFLINE));
 					}
 					break;
 				default:
@@ -105,5 +106,17 @@ export class HLSReader extends GenericReader {
 
 	public setBufferLength(length: number | null): void {
 		throw new Error("Method not implemented.");
+	}
+
+	public play() {
+		if (this.inst) {
+			this.inst.startLoad();
+		}
+	}
+
+	public pause() {
+		if (this.inst) {
+			this.inst.stopLoad();
+		}
 	}
 }

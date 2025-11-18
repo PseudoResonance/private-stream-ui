@@ -16,4 +16,5 @@ export interface ManagementData {
 	baseUrl: string;
 	publishProtocols?: Record<string, number>;
 	providerBase: string;
+	thumbnailUrlNoToken: string;
 }

@@ -168,6 +168,7 @@ export class ManagementPanel extends LitElement {
 			id="${this.managementData.id}"
 			.publishProtocols="${this.managementData.publishProtocols}"
 			providerBaseUrl="${this.managementData.providerBase}"
+			thumbnailUrlNoToken="${this.managementData.thumbnailUrlNoToken}"
 		></path-config>`;
 	}
 

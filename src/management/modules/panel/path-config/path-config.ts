@@ -25,6 +25,9 @@ export class PathConfig extends LitElement {
 	@property()
 	public providerBaseUrl: string = "";
 
+	@property()
+	public thumbnailUrlNoToken: string = "";
+
 	@state()
 	private tokens: TokenObjectType[] = [];
 
@@ -33,6 +36,9 @@ export class PathConfig extends LitElement {
 
 	@state()
 	private previewUrl: string = "";
+
+	@state()
+	private thumbnailUrl: string = "";
 
 	@state()
 	private previewActive: boolean = false;
@@ -72,12 +78,19 @@ export class PathConfig extends LitElement {
 					this.id,
 					token.querytoken as string,
 				);
+				this.thumbnailUrl = this.constructThumbnailUrl(
+					token.querytoken as string,
+				);
 				gotRead = true;
 			}
 			if (gotPublish && gotRead) {
 				return true;
 			}
 		});
+	}
+
+	private constructThumbnailUrl(token: string) {
+		return new URL(`${this.thumbnailUrlNoToken}?token=${token}`).toString();
 	}
 
 	private constructWatchUrl(id: string, token: string) {
@@ -138,7 +151,7 @@ export class PathConfig extends LitElement {
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			background-color: black;
+			background-color: rgba(0, 0, 0, 0.5);
 			color: white;
 			pointer-events: initial;
 			touch-action: initial;
@@ -171,21 +184,27 @@ export class PathConfig extends LitElement {
 						title="Stream Preview"
 						width="300"
 						height="200"
-						src="${this.previewUrl}"
+						src="${this.previewUrl}&mute"
 					>
 					</iframe>
 				</div>`;
 			} else {
+				let thumbnail =
+					this.thumbnailUrl.length > 0
+						? `background:no-repeat url('${this.thumbnailUrl}') center/contain;`
+						: "";
 				return html`<div class="sidebar">
-					<button
-						class="streamPreviewPlaceholder"
-						style="width:300px;height:200px;"
-						@click="${() => {
-							this.previewActive = true;
-						}}"
-					>
-						Click for Preview
-					</button>
+					<div style="width:300px;height:200px;${thumbnail}">
+						<button
+							class="streamPreviewPlaceholder"
+							style="width:300px;height:200px;"
+							@click="${() => {
+								this.previewActive = true;
+							}}"
+						>
+							Click for Preview
+						</button>
+					</div>
 				</div>`;
 			}
 		}

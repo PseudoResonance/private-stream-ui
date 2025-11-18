@@ -9,7 +9,7 @@ import { customElement, state } from "lit/decorators.js";
 
 import "media-chrome";
 import "media-chrome/menu";
-import { PlayerState, type VideoResolution } from "./types.ts";
+import { PlayerNotices, PlayerState, type VideoResolution } from "./types.ts";
 import {
 	StreamProtocol,
 	streamProtocolFromString,
@@ -73,12 +73,16 @@ export class StreamPlayer extends LitElement {
 					break;
 			}
 		}
+		const urlQuery = new URLSearchParams(window.location.search);
+		if (!videoElem.muted && urlQuery.get("mute") !== null) {
+			videoElem.muted = true;
+		}
 	}
 
 	@state()
 	private _videoInitState: PlayerState = PlayerState.LOADING;
 	@state()
-	private _errorMessage: TemplateResult<1> | string = "Loading Stream";
+	private _errorMessage: TemplateResult<1> | string = PlayerNotices.LOADING;
 	@state()
 	private _videoResolution: VideoResolution = { x: 16, y: 9 };
 	@state()
@@ -91,8 +95,7 @@ export class StreamPlayer extends LitElement {
 	private _videoErrorTimer: NodeJS.Timeout | undefined = undefined;
 
 	private _setErrorMessage = (msg: string) => {
-		this._errorMessage = html`${msg}<br />Retrying in
-			${StreamPlayer._retryTimeout / 1000}s`;
+		this._errorMessage = html`${msg}<br />Retrying...`;
 	};
 
 	private _setStreamProtocol = (protocol: StreamProtocol) => {
@@ -226,10 +229,11 @@ export class StreamPlayer extends LitElement {
 			playerElem?.style.setProperty("min-width", "auto");
 			playerElem?.style.setProperty("min-height", "100svh");
 		}
+		playerElem?.style.setProperty("aspect-ratio", `${videoRatio}/1`);
 	};
 
 	videoTemplate() {
-		return html` <video
+		return html`<video
 			slot="media"
 			id="html-player"
 			class="${this._videoInitState}"
@@ -251,7 +255,7 @@ export class StreamPlayer extends LitElement {
 						clearTimeout(this._videoErrorTimer);
 						this._videoErrorTimer = undefined;
 						console.error("Video stalled, assuming failed");
-						this._setErrorMessage("Stream Unavailable");
+						this._setErrorMessage(PlayerNotices.OFFLINE);
 						this._setupPlayer();
 					} catch (e) {
 						console.error(e);
@@ -264,6 +268,16 @@ export class StreamPlayer extends LitElement {
 					console.log("Video playback resuming");
 				}
 				this._videoErrorTimer = undefined;
+			}}"
+			@play="${() => {
+				if (this._streamReader) {
+					this._streamReader.play();
+				}
+			}}"
+			@pause="${() => {
+				if (this._streamReader) {
+					this._streamReader.pause();
+				}
 			}}"
 		></video>`;
 	}
@@ -394,7 +408,7 @@ export class StreamPlayer extends LitElement {
 				<media-control-bar>
 					<media-play-button
 						aria-disabled=${this._errorMessage ? true : false}
-						disabled="${this._errorMessage ? true : false}"
+						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
@@ -404,21 +418,21 @@ export class StreamPlayer extends LitElement {
 					<div class="spacer"></div>
 					<media-cast-button
 						aria-disabled=${this._errorMessage ? true : false}
-						disabled="${this._errorMessage ? true : false}"
+						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
 					></media-cast-button>
 					<media-airplay-button
 						aria-disabled=${this._errorMessage ? true : false}
-						disabled="${this._errorMessage ? true : false}"
+						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
 					></media-airplay-button>
 					<media-pip-button
 						aria-disabled=${this._errorMessage ? true : false}
-						disabled="${this._errorMessage ? true : false}"
+						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
