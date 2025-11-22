@@ -147,6 +147,12 @@ export class PathConfig extends LitElement {
 			display: flex;
 			flex-direction: column;
 		}
+		.streamPreviewThumbnail {
+			background-color: black;
+			background-repeat: no-repeat;
+			background-position: center;
+			background-size: contain;
+		}
 		.streamPreviewPlaceholder {
 			display: flex;
 			justify-content: center;
@@ -191,10 +197,13 @@ export class PathConfig extends LitElement {
 			} else {
 				let thumbnail =
 					this.thumbnailUrl.length > 0
-						? `background:no-repeat url('${this.thumbnailUrl}') center/contain;`
+						? `background-image:url('${this.thumbnailUrl}');`
 						: "";
 				return html`<div class="sidebar">
-					<div style="width:300px;height:200px;${thumbnail}">
+					<div
+						class="streamPreviewThumbnail"
+						style="width:300px;height:200px;${thumbnail}"
+					>
 						<button
 							class="streamPreviewPlaceholder"
 							style="width:300px;height:200px;"

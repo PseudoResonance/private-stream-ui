@@ -6,10 +6,11 @@ import { HLSReader } from "./hls/index.ts";
 export enum StreamProtocol {
 	WebRTC_TCP = "webrtc-tcp",
 	WebRTC_UDP = "webrtc-udp",
+	LL_HLS = "llhls",
 	HLS = "hls",
 }
 
-const defaultProtocol = StreamProtocol.HLS;
+export const DefaultProtocol = StreamProtocol.LL_HLS;
 
 export function streamProtocolFromString(
 	protocol: string | undefined | null,
@@ -20,12 +21,12 @@ export function streamProtocolFromString(
 	) {
 		return protocol as StreamProtocol;
 	} else {
-		return defaultProtocol;
+		return DefaultProtocol;
 	}
 }
 
 export class StreamReader {
-	private streamProtocol: StreamProtocol = defaultProtocol;
+	private streamProtocol: StreamProtocol = DefaultProtocol;
 
 	private backendConfig: BackendConfig = {};
 
@@ -47,6 +48,7 @@ export class StreamReader {
 						this.supportedProtocols.push(k);
 					}
 					break;
+				case StreamProtocol.LL_HLS:
 				case StreamProtocol.HLS:
 					if (HLSReader.supported()) {
 						this.supportedProtocols.push(k);
@@ -104,6 +106,7 @@ export class StreamReader {
 					});
 					break;
 				}
+			case StreamProtocol.LL_HLS:
 			case StreamProtocol.HLS:
 				if (!this.backendConfig.hlsUrl) {
 					throw {

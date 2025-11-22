@@ -11,6 +11,7 @@ import "media-chrome";
 import "media-chrome/menu";
 import { PlayerNotices, PlayerState, type VideoResolution } from "./types.ts";
 import {
+	DefaultProtocol,
 	StreamProtocol,
 	streamProtocolFromString,
 	StreamReader,
@@ -25,7 +26,7 @@ import { classMap } from "lit/directives/class-map.js";
 export class StreamPlayer extends LitElement {
 	private static _retryTimeout = 2000;
 	private static _statsTimeout = 10000;
-	private static _videoErrorTimeout = 4000;
+	private static _videoErrorTimeout = 8000;
 
 	constructor() {
 		super();
@@ -298,7 +299,7 @@ export class StreamPlayer extends LitElement {
 							);
 						} catch (e) {
 							console.error(e);
-							this._setStreamProtocol(StreamProtocol.WebRTC_UDP);
+							this._setStreamProtocol(DefaultProtocol);
 						}
 					}}"
 					slot="submenu"

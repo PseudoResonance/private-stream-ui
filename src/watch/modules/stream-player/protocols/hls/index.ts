@@ -1,6 +1,7 @@
 import Hls, { ErrorTypes, type ErrorData } from "hls.js";
 import { GenericReader, type ReaderConf } from "../interface";
 import { PlayerNotices } from "../../types";
+import { StreamProtocol } from "..";
 
 interface HLSReaderConf extends ReaderConf {
 	bufferLength: number | null;
@@ -24,7 +25,9 @@ export class HLSReader extends GenericReader {
 	protected async start() {
 		super.start();
 		try {
-			this.inst = new Hls();
+			this.inst = new Hls({
+				lowLatencyMode: this.conf.protocol === StreamProtocol.LL_HLS,
+			});
 			this.inst.on(Hls.Events.ERROR, this.onError);
 			this.inst.on(Hls.Events.MEDIA_ATTACHED, () => {
 				console.log("HLS bound to video element");
