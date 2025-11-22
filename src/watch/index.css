@@ -30,6 +30,10 @@ body {
 	overflow: hidden;
 }
 
+#content.embed {
+	background: transparent !important;
+}
+
 .popupWrapper {
 	position: absolute;
 	left: 0;

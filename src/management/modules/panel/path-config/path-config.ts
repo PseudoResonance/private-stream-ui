@@ -147,6 +147,9 @@ export class PathConfig extends LitElement {
 			display: flex;
 			flex-direction: column;
 		}
+		.streamPreview {
+			background-color: black;
+		}
 		.streamPreviewThumbnail {
 			background-color: black;
 			background-repeat: no-repeat;
@@ -190,7 +193,8 @@ export class PathConfig extends LitElement {
 						title="Stream Preview"
 						width="300"
 						height="200"
-						src="${this.previewUrl}&mute"
+						allowtransparency="true"
+						src="${this.previewUrl}&mute&embed"
 					>
 					</iframe>
 				</div>`;

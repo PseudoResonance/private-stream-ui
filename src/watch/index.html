@@ -7,6 +7,17 @@
 		<link href="./index.css" rel="stylesheet" />
 		<!-- HEAD-META-TEMPLATE -->
 		<script type="module" src="./modules/stream-player/index.ts"></script>
+		<script>
+			window.addEventListener("load", () => {
+				const urlQuery = new URLSearchParams(window.location.search);
+				if (urlQuery.get("embed") !== null) {
+					const elem = document.getElementById("content");
+					if (elem) {
+						elem.classList.add("embed");
+					}
+				}
+			});
+		</script>
 	</head>
 	<body>
 		<div id="content">
