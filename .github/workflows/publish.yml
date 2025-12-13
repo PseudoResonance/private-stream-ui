@@ -31,7 +31,7 @@ jobs:
       - id: teststep
         name: Exit when version not bumped
         run: |
-          LATEST_TAG=$(git describe --match "*" --exclude "private-stream-ui-*" --abbrev=0 --tags HEAD)
+          LATEST_TAG=$(git describe --match "*" --exclude "private-stream-ui-*" --abbrev=0 --tags HEAD) || true
           CURRENT_VERSION=$(npm pkg get version | xargs)
           echo "Previous: \"${LATEST_TAG}\" Current: \"${CURRENT_VERSION}\""
           if [ $LATEST_TAG == $CURRENT_VERSION ]; then
