@@ -1,0 +1,30 @@
+{
+	"retrying": "Retrying...",
+	"errorUnknown": "Unknown Error",
+	"unknown": "Unknown",
+	"invalid": "Invalid",
+	"debug": "Debug",
+	"debugInfo": "Debug Info",
+	"close": "Close",
+	"protocol": "Protocol",
+	"statsUnavailable": "Stats Unavailable",
+	"playerStateLoading": "Stream Loading",
+	"playerStateOffline": "Stream Unavailable",
+	"error": "Error: {0}",
+
+	"invalidState": "Invalid State: {0}",
+	"sdpMissing": "SDP Not Present",
+	"streamLocationInvalid": "Invalid Stream Location",
+	"notConnected": "Not Connected",
+	"sessionUrlMissing": "Session URL Missing",
+	"offerDataMissing": "Offer Data Missing",
+	"peerConnectionClosed": "Peer Connection Closed",
+	"errorReceivingTrack": "Error While Receiving Track",
+
+	"statBytesReceived": "Received: {0} ({1}B)",
+	"statLatency": "Latency: {0}",
+	"statJitter": "Jitter: {0}",
+	"statReceived": "Received: {0}",
+	"statDiscarded": "Discarded: {0}",
+	"statLost": "Lost: {0}"
+}

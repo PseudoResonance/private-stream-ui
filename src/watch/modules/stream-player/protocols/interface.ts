@@ -1,4 +1,5 @@
 import type { StreamProtocol } from ".";
+import type { PlayerStats } from "../types";
 
 export enum PlayerState {
 	INITIALIZING = "Initializing",
@@ -12,6 +13,8 @@ export interface ReaderConf {
 	username?: string;
 	password?: string;
 	token?: string;
+	statsInterval?: number;
+	onStats?: (stats: PlayerStats) => void;
 	onError?: (err: unknown) => void;
 }
 
@@ -30,10 +33,6 @@ export abstract class GenericReader {
 	public close() {
 		this.state = PlayerState.CLOSED;
 	}
-
-	public abstract getStats(): Promise<unknown>;
-
-	public abstract setBufferLength(length: number | null): void;
 
 	protected handleError(err: unknown) {
 		if (typeof this.conf.onError === "function") {

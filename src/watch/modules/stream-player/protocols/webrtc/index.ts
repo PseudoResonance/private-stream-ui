@@ -1,5 +1,7 @@
 import { StreamProtocol } from "..";
-import { PlayerNotices } from "../../types";
+import { i18n } from "../../../../../lang";
+import type { PlayerStats } from "../../types";
+import { prettyBytes, prettyMilliseconds, prettyNumber } from "../../util";
 import { GenericReader, PlayerState, type ReaderConf } from "../interface";
 
 interface ICEServerList {
@@ -16,7 +18,6 @@ interface SDPOffer {
 }
 
 interface WebRTCReaderConf extends ReaderConf {
-	bufferLength: number | null;
 	onTrack: (evt: RTCTrackEvent) => void;
 }
 
@@ -26,6 +27,8 @@ export class WebRTCReader extends GenericReader {
 	private offerData: SDPOffer | null = null;
 	private sessionUrl: string | null = null;
 	private queuedCandidates: RTCIceCandidate[] = [];
+
+	private statsTimer: NodeJS.Timeout | undefined = undefined;
 
 	constructor(conf: WebRTCReaderConf) {
 		super(conf);
@@ -51,6 +54,7 @@ export class WebRTCReader extends GenericReader {
 		if (this.peerConnection !== null) {
 			this.peerConnection.close();
 		}
+		clearTimeout(this.statsTimer);
 	}
 
 	public static supported(): boolean {
@@ -101,7 +105,7 @@ export class WebRTCReader extends GenericReader {
 		iceServers: ICEServerList[],
 	): Promise<string> {
 		if (this.state !== PlayerState.RUNNING) {
-			throw new Error(`Invalid state: ${this.state}`);
+			throw new Error(i18n("invalidState", this.state));
 		}
 
 		this.peerConnection = new RTCPeerConnection({
@@ -128,12 +132,17 @@ export class WebRTCReader extends GenericReader {
 		const offer = await this.peerConnection.createOffer();
 
 		if (offer.sdp === undefined) {
-			throw new Error("SDP not present");
+			throw new Error(i18n("sdpMissing"));
 		}
 
 		this.offerData = WebRTCReader.parseOffer(offer.sdp);
 
 		await this.peerConnection.setLocalDescription(offer);
+		if (this.childConf.statsInterval)
+			this.statsTimer = setTimeout(
+				this.processStats,
+				this.childConf.statsInterval,
+			);
 		return offer.sdp;
 	}
 
@@ -159,7 +168,7 @@ export class WebRTCReader extends GenericReader {
 
 	private async sendOffer(offer: string): Promise<string> {
 		if (this.state !== PlayerState.RUNNING) {
-			throw new Error(`Invalid state: ${this.state}`);
+			throw new Error(i18n("invalidState", this.state));
 		}
 
 		const res = await fetch(this.conf.url, {
@@ -177,14 +186,14 @@ export class WebRTCReader extends GenericReader {
 			case 401:
 			case 403:
 			case 404:
-				throw new Error(PlayerNotices.OFFLINE);
+				throw new Error(i18n("playerStateOffline"));
 			default:
-				throw new Error(`Error ${res.status}`);
+				throw new Error(i18n("error", res.status));
 		}
 
 		const location = res.headers.get("location");
 		if (location === null) {
-			throw new Error("Invalid Stream Location");
+			throw new Error(i18n("streamLocationInvalid"));
 		}
 
 		this.sessionUrl = new URL(location, this.conf.url).toString();
@@ -214,11 +223,11 @@ export class WebRTCReader extends GenericReader {
 
 	private async setAnswer(answer: string) {
 		if (this.state !== PlayerState.RUNNING) {
-			throw new Error(`Invalid state: ${this.state}`);
+			throw new Error(i18n("invalidState", this.state));
 		}
 
 		if (this.peerConnection === null) {
-			throw new Error("Not Connected");
+			throw new Error(i18n("notConnected"));
 		}
 
 		await this.peerConnection.setRemoteDescription(
@@ -259,11 +268,11 @@ export class WebRTCReader extends GenericReader {
 
 	private sendLocalCandidates(candidates: RTCIceCandidate[]) {
 		if (this.sessionUrl === null) {
-			this.handleError(new Error("No Session URL"));
+			this.handleError(new Error(i18n("sessionUrlMissing")));
 			return;
 		}
 		if (this.offerData === null) {
-			this.handleError(new Error("No Offer Data"));
+			this.handleError(new Error(i18n("offerDataMissing")));
 			return;
 		}
 		fetch(this.sessionUrl, {
@@ -285,9 +294,9 @@ export class WebRTCReader extends GenericReader {
 					case 204:
 						break;
 					case 404:
-						throw new Error(PlayerNotices.OFFLINE);
+						throw new Error(i18n("playerStateOffline"));
 					default:
-						throw new Error(`Error ${res.status}`);
+						throw new Error(i18n("error", res.status));
 				}
 			})
 			.catch((err) => {
@@ -350,37 +359,17 @@ export class WebRTCReader extends GenericReader {
 			this.peerConnection?.connectionState === "failed" ||
 			this.peerConnection?.connectionState === "closed"
 		) {
-			this.handleError(new Error("Peer Connection Closed"));
+			this.handleError(new Error(i18n("peerConnectionClosed")));
 		}
 	}
 
 	private onTrack(evt: RTCTrackEvent) {
 		try {
-			if (
-				this.childConf?.bufferLength === null ||
-				this.childConf?.bufferLength >
-					(evt.receiver.jitterBufferTarget ?? 0)
-			) {
-				evt.receiver.jitterBufferTarget =
-					this.childConf?.bufferLength === null
-						? null
-						: Math.min(this.childConf?.bufferLength, 4000);
-			}
-		} catch (e) {
-			console.error(e);
-		}
-		try {
 			if (typeof this.childConf?.onTrack === "function") {
 				this.childConf.onTrack(evt);
 			}
 		} catch (e) {
-			this.handleError(new Error("Error while receiving track"));
-		}
-	}
-
-	public async getStats(): Promise<unknown> {
-		if (this.peerConnection) {
-			return await this.peerConnection.getStats();
+			this.handleError(new Error(i18n("errorReceivingTrack")));
 		}
 	}
 
@@ -397,4 +386,98 @@ export class WebRTCReader extends GenericReader {
 	public pause() {
 		// Not implemented
 	}
+
+	private processStats = async () => {
+		if (typeof this.childConf.onStats === "function") {
+			try {
+				let stats;
+				if (this.peerConnection) {
+					try {
+						stats = await this.peerConnection.getStats();
+					} catch (_) {}
+				}
+				if (stats) {
+					if (
+						typeof stats === "object" &&
+						stats.constructor.name === "RTCStatsReport"
+					) {
+						let jitterArr: number[] = [];
+						let jitterBufferArr: number[] = [];
+						let bytesReceived = 0;
+						let packetsReceived = 0;
+						let packetsDiscarded = 0;
+						let packetsLost = 0;
+						(stats as RTCStatsReport).forEach((entry) => {
+							if (entry.type === "inbound-rtp") {
+								bytesReceived += entry.bytesReceived;
+								jitterArr.push(entry.jitter);
+								jitterBufferArr.push(
+									Math.max(entry.jitterBufferTargetDelay, 0) /
+										entry.jitterBufferEmittedCount,
+								);
+								packetsReceived += Math.max(
+									entry.packetsReceived,
+									0,
+								);
+								packetsDiscarded += Math.max(
+									entry.packetsDiscarded,
+									0,
+								);
+								packetsLost += Math.max(entry.packetsLost, 0);
+							}
+						});
+						const statsObj: PlayerStats = [
+							{
+								type: "value",
+								key: "statBytesReceived",
+								value: [
+									prettyBytes(bytesReceived),
+									bytesReceived,
+								],
+							},
+							{
+								type: "value",
+								key: "statLatency",
+								value: prettyMilliseconds(
+									jitterBufferArr.reduce((a, b) => a + b, 0) /
+										jitterBufferArr.length,
+								),
+							},
+							{
+								type: "value",
+								key: "statJitter",
+								value: prettyMilliseconds(
+									jitterArr.reduce((a, b) => a + b, 0) /
+										jitterArr.length,
+								),
+							},
+							{
+								type: "value",
+								key: "statReceived",
+								value: prettyNumber(packetsReceived),
+							},
+							{
+								type: "value",
+								key: "statDiscarded",
+								value: prettyNumber(packetsDiscarded),
+							},
+							{
+								type: "value",
+								key: "statLost",
+								value: prettyNumber(packetsLost),
+							},
+						];
+						this.childConf.onStats(statsObj);
+					}
+				}
+			} catch (e) {
+				console.error("Error while fetching stats", e);
+			}
+		}
+		if (this.childConf.statsInterval)
+			this.statsTimer = setTimeout(
+				this.processStats,
+				this.childConf.statsInterval,
+			);
+	};
 }

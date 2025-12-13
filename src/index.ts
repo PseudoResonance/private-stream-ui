@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import express from "express";
 import ViteExpress from "vite-express";
 import { auth, requiresAuth } from "express-openid-connect";
+import * as watchDefaultLang from "./watch/lang/en-US.json";
 
 import Config from "./config";
 import type { BackendConfig, ManagementData, UserData } from "./types";
@@ -90,6 +91,9 @@ ViteExpress.config({
                 ${configObj.thumbnailUrl ? `<meta property="og:image" content="${configObj.thumbnailUrl}" />` : ""}
                 <script>
                     window.REMOTE_CONFIG = ${JSON.stringify(configObj)};
+                </script>
+                <script>
+                    window.DEFAULT_I18N = ${JSON.stringify(watchDefaultLang)};
                 </script>
 			`,
 			);

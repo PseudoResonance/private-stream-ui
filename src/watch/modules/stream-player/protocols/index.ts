@@ -2,6 +2,7 @@ import { WebRTCReader } from "./webrtc/index.ts";
 import type { BackendConfig } from "../../../../types.ts";
 import type { GenericReader } from "./interface.ts";
 import { HLSReader } from "./hls/index.ts";
+import type { PlayerStats } from "../types.ts";
 
 export enum StreamProtocol {
 	WebRTC_TCP = "webrtc-tcp",
@@ -33,7 +34,8 @@ export class StreamReader {
 	private reader: GenericReader | undefined = undefined;
 
 	private video: HTMLVideoElement | undefined = undefined;
-	private bufferLength: number | null = null;
+	private statsInterval: number = 0;
+	private onStats: (stats: PlayerStats) => void = () => {};
 	private onError: (err: unknown) => void = () => {};
 
 	private supportedProtocols: StreamProtocol[] = [];
@@ -67,11 +69,13 @@ export class StreamReader {
 
 	public async start(
 		video: HTMLVideoElement,
-		bufferLength: number | null,
+		statsInterval: number,
+		onStats: (stats: PlayerStats) => void,
 		onError: (err: unknown) => void,
 	) {
 		this.video = video;
-		this.bufferLength = bufferLength;
+		this.statsInterval = statsInterval;
+		this.onStats = onStats;
 		this.onError = onError;
 		this._start();
 	}
@@ -95,7 +99,8 @@ export class StreamReader {
 					this.reader = new WebRTCReader({
 						url: this.backendConfig.webRtcUrl,
 						protocol: this.streamProtocol,
-						bufferLength: this.bufferLength,
+						statsInterval: this.statsInterval,
+						onStats: this.onStats,
 						onError: this.onError,
 						onTrack: (evt: unknown) => {
 							if (this.video) {
@@ -119,8 +124,9 @@ export class StreamReader {
 					this.reader = new HLSReader({
 						url: this.backendConfig.hlsUrl,
 						protocol: this.streamProtocol,
-						bufferLength: this.bufferLength,
 						videoElement: this.video,
+						statsInterval: this.statsInterval,
+						onStats: this.onStats,
 						onError: this.onError,
 					});
 				} else {
@@ -140,24 +146,11 @@ export class StreamReader {
 		}
 	}
 
-	public async getStats(): Promise<unknown> {
-		if (this.reader) {
-			return await this.reader.getStats();
-		}
-	}
-
-	public setBufferLength(length: number | null) {
-		if (this.reader) {
-			this.bufferLength = length;
-			this.reader.close();
-			this._start();
-		}
-	}
-
 	public close() {
 		if (this.reader) {
 			this.reader.close();
 		}
+		this.onStats([]);
 	}
 
 	public play() {

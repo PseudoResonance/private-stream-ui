@@ -9,7 +9,11 @@ import { customElement, state } from "lit/decorators.js";
 
 import "media-chrome";
 import "media-chrome/menu";
-import { PlayerNotices, PlayerState, type VideoResolution } from "./types.ts";
+import {
+	PlayerState,
+	type PlayerStats,
+	type VideoResolution,
+} from "./types.ts";
 import {
 	DefaultProtocol,
 	StreamProtocol,
@@ -21,11 +25,12 @@ import {
 	createMenuItem,
 } from "media-chrome/dist/menu/media-chrome-menu.js";
 import { classMap } from "lit/directives/class-map.js";
+import { i18n } from "../../../lang.ts";
 
 @customElement("stream-player")
 export class StreamPlayer extends LitElement {
 	private static _retryTimeout = 2000;
-	private static _statsTimeout = 10000;
+	private static _statsTimeout = 3000;
 	private static _videoErrorTimeout = 8000;
 
 	constructor() {
@@ -43,10 +48,6 @@ export class StreamPlayer extends LitElement {
 		window.addEventListener("beforeunload", () => {
 			this._streamReader.close();
 		});
-		this._statsTimer = setTimeout(
-			this._processStats,
-			StreamPlayer._statsTimeout,
-		);
 	}
 
 	protected firstUpdated(_changedProperties: PropertyValues): void {
@@ -83,20 +84,24 @@ export class StreamPlayer extends LitElement {
 	@state()
 	private _videoInitState: PlayerState = PlayerState.LOADING;
 	@state()
-	private _errorMessage: TemplateResult<1> | string = PlayerNotices.LOADING;
+	private _errorMessage: TemplateResult<1> | string =
+		i18n("playerStateLoading");
 	@state()
 	private _videoResolution: VideoResolution = { x: 16, y: 9 };
 	@state()
 	private _streamProtocol: StreamProtocol;
+	@state()
+	private _debugVisible: boolean = false;
+	@state()
+	private _debugStats: PlayerStats = [];
 
-	private _statsTimer: NodeJS.Timeout | undefined = undefined;
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
 
 	private _videoErrorTimer: NodeJS.Timeout | undefined = undefined;
 
 	private _setErrorMessage = (msg: string) => {
-		this._errorMessage = html`${msg}<br />Retrying...`;
+		this._errorMessage = html`${msg}<br />${i18n("retrying")}`;
 	};
 
 	private _setStreamProtocol = (protocol: StreamProtocol) => {
@@ -121,13 +126,16 @@ export class StreamPlayer extends LitElement {
 			await this._streamReader.setup(this._streamProtocol);
 			await this._streamReader.start(
 				videoElem,
-				null, //TODO buffer size
+				StreamPlayer._statsTimeout,
+				(stats) => {
+					this._debugStats = stats;
+				},
 				(e) => {
 					if (e && typeof e === "object") {
 						if ("message" in e) {
 							this._setErrorMessage(String(e.message));
 						} else {
-							this._setErrorMessage("Unknown Error");
+							this._setErrorMessage(i18n("errorUnknown"));
 						}
 					} else {
 						this._setErrorMessage(String(e));
@@ -144,7 +152,7 @@ export class StreamPlayer extends LitElement {
 				if ("message" in e) {
 					this._setErrorMessage(String(e.message));
 				} else {
-					this._setErrorMessage("Unknown Error");
+					this._setErrorMessage(i18n("errorUnknown"));
 				}
 			} else {
 				this._setErrorMessage(String(e));
@@ -155,59 +163,6 @@ export class StreamPlayer extends LitElement {
 				StreamPlayer._retryTimeout,
 			);
 		}
-	};
-
-	private _processStats = async () => {
-		try {
-			let stats;
-			if (this._streamReader) {
-				try {
-					stats = await this._streamReader.getStats();
-				} catch (_) {}
-			}
-			if (stats) {
-				if (
-					typeof stats === "object" &&
-					stats.constructor.name === "RTCStatsReport"
-				) {
-					const statsObj = {
-						bytesReceived: 0,
-						jitter: 0,
-						jitterBuffer: 0,
-						packetsDiscarded: 0,
-						packetsLost: 0,
-						packetsReceived: 0,
-					};
-					let jitterArr: number[] = [];
-					let jitterBufferArr: number[] = [];
-					(stats as RTCStatsReport).forEach((entry) => {
-						if (entry.type === "inbound-rtp") {
-							statsObj.bytesReceived += entry.bytesReceived;
-							jitterArr.push(entry.jitter);
-							jitterBufferArr.push(
-								entry.jitterBufferTargetDelay /
-									entry.jitterBufferEmittedCount,
-							);
-							statsObj.packetsDiscarded += entry.packetsDiscarded;
-							statsObj.packetsLost += entry.packetsLost;
-							statsObj.packetsReceived += entry.packetsReceived;
-						}
-					});
-					statsObj.jitter =
-						jitterArr.reduce((a, b) => a + b, 0) / jitterArr.length;
-					statsObj.jitterBuffer =
-						jitterBufferArr.reduce((a, b) => a + b, 0) /
-						jitterBufferArr.length;
-					console.log(statsObj);
-				}
-			}
-		} catch (e) {
-			console.error("Error while fetching stats", e);
-		}
-		this._statsTimer = setTimeout(
-			this._processStats,
-			StreamPlayer._statsTimeout,
-		);
 	};
 
 	private _recalculateVideoFit = () => {
@@ -256,7 +211,7 @@ export class StreamPlayer extends LitElement {
 						clearTimeout(this._videoErrorTimer);
 						this._videoErrorTimer = undefined;
 						console.error("Video stalled, assuming failed");
-						this._setErrorMessage(PlayerNotices.OFFLINE);
+						this._setErrorMessage(i18n("playerStateOffline"));
 						this._setupPlayer();
 					} catch (e) {
 						console.error(e);
@@ -285,9 +240,20 @@ export class StreamPlayer extends LitElement {
 
 	settingsTemplate() {
 		const supportedProtocols = this._streamReader.getSupportedProtocols();
-		return html` <media-settings-menu hidden anchor="auto">
+		return html`<media-settings-menu hidden anchor="auto">
+			<media-chrome-menu-item
+				@click="${() => {
+					this._debugVisible = !this._debugVisible;
+				}}"
+				@keydown="${(e: KeyboardEvent) => {
+					if (e.key === "Enter" || e.key === " ")
+						this._debugVisible = !this._debugVisible;
+				}}"
+			>
+				<span>${i18n("debug")}</span>
+			</media-chrome-menu-item>
 			<media-settings-menu-item>
-				Protocol
+				${i18n("protocol")}
 				<media-chrome-menu
 					@change="${(e: Event) => {
 						try {
@@ -305,7 +271,7 @@ export class StreamPlayer extends LitElement {
 					slot="submenu"
 					hidden
 				>
-					<div slot="title">Protocol</div>
+					<div slot="title">${i18n("protocol")}</div>
 					${Object.entries(StreamProtocol)
 						.filter(([_, v]) => supportedProtocols.includes(v))
 						.map(([k, v]) => {
@@ -323,6 +289,65 @@ export class StreamPlayer extends LitElement {
 				</media-chrome-menu>
 			</media-settings-menu-item>
 		</media-settings-menu>`;
+	}
+
+	debugTemplate() {
+		return html`<div
+				class="debugClose"
+				aria-hidden="${this._debugVisible}"
+				role="dialog"
+				aria-label="${i18n("debugInfo")}"
+				aria-modal="false"
+			>
+				<div
+					class="debugCloseButton"
+					role="button"
+					tabindex="0"
+					aria-pressed="false"
+					aria-label="${i18n("close")}"
+					focusable="${this._debugVisible}"
+					aria-hidden="${this._debugVisible}"
+					@click="${() => {
+						this._debugVisible = false;
+					}}"
+					@keydown="${(e: KeyboardEvent) => {
+						if (e.key === "Enter" || e.key === " ")
+							this._debugVisible = false;
+					}}"
+				>
+					<svg
+						viewBox="0 0 11 11"
+						transform="translate(-5.5 2.25) rotate(45, 5.5, 5.5)"
+						width="100%"
+						height="100%"
+					>
+						<rect
+							width="100%"
+							height="1"
+							y="5"
+							fill="var(--fg-color)"
+						/>
+						<rect
+							width="1"
+							height="100%"
+							x="5"
+							fill="var(--fg-color)"
+						/>
+					</svg>
+				</div>
+			</div>
+			<div class="debugInner">
+				${this._debugStats.length > 0
+					? this._debugStats.map((val) => {
+							return html`<p>
+								${i18n(
+									val.key,
+									...([] as any[]).concat(val.value),
+								)}
+							</p>`;
+						})
+					: html`<p>${i18n("statsUnavailable")}</p>`}
+			</div>`;
 	}
 
 	static styles = css`
@@ -346,14 +371,13 @@ export class StreamPlayer extends LitElement {
 			object-fit: contain;
 			min-width: 100vmin;
 			min-height: 100vmin;
-			pointer-events: none;
-			touch-action: none;
 		}
 		video::-webkit-media-controls-start-playback-button,
 		video::-webkit-media-controls,
 		video::-webkit-media-controls-enclosure {
 			display: none !important;
 		}
+
 		.error {
 			position: absolute;
 			left: 0;
@@ -370,13 +394,21 @@ export class StreamPlayer extends LitElement {
 			font-weight: bold;
 			color: var(--fg-color);
 			pointer-events: none;
+			touch-action: none;
 			padding: 20px;
 			box-sizing: border-box;
+			opacity: 100% !important;
+			user-select: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+			-moz-user-select: none;
 		}
 		.error.active .errorContent {
 			padding: 10px;
 			background: var(--overlay-bg-color);
 			border-radius: var(--border-radius);
+			line-height: initial;
 			/* backdrop-filter: var(--popup-filter); */
 		}
 
@@ -400,12 +432,92 @@ export class StreamPlayer extends LitElement {
 		media-pip-button[mediaispip] {
 			--media-primary-color: var(--button-active-color);
 		}
+
+		.debugWrapper {
+			--padding: 5px;
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: calc(100% - (2 * var(--padding)));
+			height: calc(100% - (2 * var(--padding)));
+			max-width: 100svw;
+			max-height: 100svh;
+			display: flex;
+			align-items: flex-start;
+			color: var(--fg-color);
+			pointer-events: none;
+			touch-action: none;
+			opacity: 100% !important;
+			user-select: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+			-moz-user-select: none;
+			padding: var(--padding);
+		}
+		.debug {
+			display: none;
+			position: relative;
+		}
+		.debug.active {
+			display: flex;
+			flex-direction: column;
+			background: var(--overlay-bg-color);
+			border-radius: var(--border-radius);
+			line-height: initial;
+			/* backdrop-filter: var(--popup-filter); */
+		}
+		.debugInner {
+			--padding: 10px;
+			padding: var(--padding);
+			display: block;
+		}
+		.debugClose {
+			--padding: 5px;
+			display: flex;
+			align-items: flex-start;
+			justify-content: flex-end;
+			padding-right: var(--padding);
+			padding-top: var(--padding);
+		}
+		.debugCloseButton {
+			pointer-events: initial;
+			touch-action: initial;
+			position: relative;
+			width: 0.4cm;
+			height: 0.4cm;
+		}
+		.debugInner p {
+			margin: 0.05cm;
+		}
 	`;
 
 	render() {
 		return html`
-			<media-controller>
-				${this.videoTemplate()} ${this.settingsTemplate()}
+			<media-controller
+				?gesturesdisabled="${this._errorMessage ? true : false}"
+			>
+				${this.videoTemplate()}${this.settingsTemplate()}
+				<div
+					class=${classMap({
+						active: this._errorMessage ? true : false,
+						error: true,
+					})}
+					aria-hidden="${this._errorMessage ? false : true}"
+					aria-modal="${this._errorMessage ? true : false}"
+				>
+					<span class="errorContent">${this._errorMessage}</span>
+				</div>
+				<div class="debugWrapper">
+					<div
+						class=${classMap({
+							active: this._debugVisible,
+							debug: true,
+						})}
+					>
+						${this.debugTemplate()}
+					</div>
+				</div>
 				<media-control-bar>
 					<media-play-button
 						aria-disabled=${this._errorMessage ? true : false}
@@ -442,16 +554,6 @@ export class StreamPlayer extends LitElement {
 					<media-fullscreen-button></media-fullscreen-button>
 				</media-control-bar>
 			</media-controller>
-			<div
-				class=${classMap({
-					active: this._errorMessage ? true : false,
-					error: true,
-				})}
-				aria-hidden="${this._errorMessage ? false : true}"
-				aria-modal="${this._errorMessage ? true : false}"
-			>
-				<span class="errorContent">${this._errorMessage}</span>
-			</div>
 		`;
 	}
 }
