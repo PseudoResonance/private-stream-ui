@@ -8,7 +8,7 @@ export function i18n(key: string, ...args: unknown[]): string {
 			return str;
 		} else {
 			return str.replace(/{(\d+)}/g, (m, i) => {
-				return args[i] ? String(args[i]) : m;
+				return args[i] !== undefined ? String(args[i]) : m;
 			});
 		}
 	}

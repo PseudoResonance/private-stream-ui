@@ -73,11 +73,7 @@ export class HLSReader extends GenericReader {
 				this.childConf.videoElement.srcObject = null;
 			} catch (_) {}
 			if (this.childConf.statsInterval)
-				this.statsTimer = setTimeout(
-					this.processStats,
-					this.childConf.statsInterval,
-				);
-			this.inst.attachMedia(this.childConf.videoElement);
+				this.inst.attachMedia(this.childConf.videoElement);
 		} catch (err) {
 			this.handleError(err);
 		}
@@ -99,6 +95,12 @@ export class HLSReader extends GenericReader {
 	}
 
 	private onPlayListener = () => {
+		if (!this.statsTimer) {
+			this.statsTimer = setTimeout(
+				this.processStats,
+				this.childConf.statsInterval,
+			);
+		}
 		clearTimeout(this.loadTimer);
 		if (typeof this.inst?.liveSyncPosition === "number")
 			this.childConf.videoElement.currentTime =
@@ -142,7 +144,7 @@ export class HLSReader extends GenericReader {
 					key: "statBytesReceived",
 					value: [
 						prettyBytes(this.statsBuffer.bytesReceived),
-						this.statsBuffer.bytesReceived,
+						this.statsBuffer.bytesReceived ?? 0,
 					],
 				},
 				{
