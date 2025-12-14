@@ -21,10 +21,15 @@
 	"peerConnectionClosed": "Peer Connection Closed",
 	"errorReceivingTrack": "Error While Receiving Track",
 
-	"statBytesReceived": "Received: {0} ({1}B)",
-	"statLatency": "Latency: {0}",
-	"statJitter": "Jitter: {0}",
-	"statReceived": "Received: {0}",
-	"statDiscarded": "Discarded: {0}",
-	"statLost": "Lost: {0}"
+	"statBytesReceived": "Received:",
+	"statBandwidth": "Bandwidth:",
+	"statLatency": "Latency:",
+	"statJitter": "Jitter:",
+	"statReceived": "Received:",
+	"statDiscarded": "Discarded:",
+	"statLost": "Lost:",
+	"statResolution": "Resolution:",
+	"statResolutionValue": "{0}px × {1}px",
+	"fragCount": "{0} Fragments",
+	"packetCount": "{0} Packets"
 }

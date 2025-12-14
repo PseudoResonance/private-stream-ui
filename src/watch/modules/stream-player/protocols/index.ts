@@ -150,7 +150,6 @@ export class StreamReader {
 		if (this.reader) {
 			this.reader.close();
 		}
-		this.onStats([]);
 	}
 
 	public play() {

@@ -29,6 +29,7 @@ export class WebRTCReader extends GenericReader {
 	private queuedCandidates: RTCIceCandidate[] = [];
 
 	private statsTimer: NodeJS.Timeout | undefined = undefined;
+	private bytesReceivedLast: number = 0;
 
 	constructor(conf: WebRTCReaderConf) {
 		super(conf);
@@ -426,45 +427,85 @@ export class WebRTCReader extends GenericReader {
 								packetsLost += Math.max(entry.packetsLost, 0);
 							}
 						});
+						const latency =
+							jitterBufferArr.reduce((a, b) => a + b, 0) /
+							jitterBufferArr.length;
+						const jitter =
+							jitterArr.reduce((a, b) => a + b, 0) /
+							jitterArr.length;
+						const bandwidth = this.childConf.statsInterval
+							? ((bytesReceived - this.bytesReceivedLast) * 8) /
+								(this.childConf.statsInterval / 1000)
+							: 0;
+						this.bytesReceivedLast = bytesReceived;
 						const statsObj: PlayerStats = [
 							{
 								type: "value",
+								id: "statBytesReceived",
 								key: "statBytesReceived",
-								value: [
-									prettyBytes(bytesReceived),
-									bytesReceived,
-								],
+								value: `${prettyBytes(bytesReceived, "iec")} (${bytesReceived ?? 0}B)`,
 							},
 							{
-								type: "value",
+								type: "graph",
+								id: "statBandwidth",
+								key: "statBandwidth",
+								history: [],
+								graphColor: "red",
+								backgroundColor: "black",
+								value: bandwidth,
+								valueString: prettyBytes(
+									bandwidth,
+									"iec_bits_per_second",
+								),
+							},
+							{
+								type: "graph",
+								id: "statLatency",
 								key: "statLatency",
-								value: prettyMilliseconds(
-									jitterBufferArr.reduce((a, b) => a + b, 0) /
-										jitterBufferArr.length,
-								),
+								history: [],
+								stdDevScale: true,
+								graphColor: "red",
+								backgroundColor: "black",
+								value: latency,
+								valueString: prettyMilliseconds(latency),
 							},
 							{
-								type: "value",
+								type: "graph",
+								id: "statJitter",
 								key: "statJitter",
-								value: prettyMilliseconds(
-									jitterArr.reduce((a, b) => a + b, 0) /
-										jitterArr.length,
+								history: [],
+								stdDevScale: true,
+								graphColor: "red",
+								backgroundColor: "black",
+								value: jitter,
+								valueString: prettyMilliseconds(jitter),
+							},
+							{
+								type: "value",
+								id: "statPacketsReceived",
+								key: "statReceived",
+								value: i18n(
+									"packetCount",
+									prettyNumber(packetsReceived),
 								),
 							},
 							{
 								type: "value",
-								key: "statReceived",
-								value: prettyNumber(packetsReceived),
-							},
-							{
-								type: "value",
+								id: "statPacketsDiscarded",
 								key: "statDiscarded",
-								value: prettyNumber(packetsDiscarded),
+								value: i18n(
+									"packetCount",
+									prettyNumber(packetsDiscarded),
+								),
 							},
 							{
 								type: "value",
+								id: "statPacketsLost",
 								key: "statLost",
-								value: prettyNumber(packetsLost),
+								value: i18n(
+									"packetCount",
+									prettyNumber(packetsLost),
+								),
 							},
 						];
 						this.childConf.onStats(statsObj);

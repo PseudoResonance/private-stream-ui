@@ -12,6 +12,8 @@ import "media-chrome/menu";
 import {
 	PlayerState,
 	type PlayerStats,
+	type StatTypes,
+	type StatTypesAll,
 	type VideoResolution,
 } from "./types.ts";
 import {
@@ -26,12 +28,26 @@ import {
 } from "media-chrome/dist/menu/media-chrome-menu.js";
 import { classMap } from "lit/directives/class-map.js";
 import { i18n } from "../../../lang.ts";
+import "./modules-debug/graph";
 
 @customElement("stream-player")
 export class StreamPlayer extends LitElement {
-	private static _retryTimeout = 2000;
-	private static _statsTimeout = 3000;
-	private static _videoErrorTimeout = 8000;
+	/**
+	 * Timeout in ms before retrying video stream
+	 */
+	private static RETRY_TIMEOUT = 2000;
+	/**
+	 * Interval in ms to pull new stats
+	 */
+	private static STATS_REFRESH_INTERVAL = 1500;
+	/**
+	 * Max entries in history state
+	 */
+	private static STATS_MAX_HISTORY = 50;
+	/**
+	 * Duration in ms after which video is declared dead, and retry process is started
+	 */
+	private static VIDEO_ERROR_TIMEOUT = 8000;
 
 	constructor() {
 		super();
@@ -93,7 +109,9 @@ export class StreamPlayer extends LitElement {
 	@state()
 	private _debugVisible: boolean = false;
 	@state()
-	private _debugStats: PlayerStats = [];
+	private _debugStats: Record<string, StatTypesAll> = {};
+
+	private _globalStats: Record<string, StatTypesAll> = {};
 
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
@@ -110,8 +128,45 @@ export class StreamPlayer extends LitElement {
 			this._streamProtocol = protocol;
 			localStorage.setItem("stream-protocol", protocol);
 			this._streamReader.close();
+			this._debugStats = {};
+			this._globalStats = {};
 			this._setupPlayer();
 		}
+	};
+
+	private _handleDebugStats = (global: boolean = false) => {
+		return (stats: PlayerStats) => {
+			const work = { ...(global ? this._globalStats : this._debugStats) };
+			for (const [id, entry] of Object.entries(stats)) {
+				if (!(id in work)) {
+					work[id] = entry;
+				} else {
+					switch (entry.type) {
+						case "graph":
+							const historyOld = (work[id] as StatTypes.StatGraph)
+								.history;
+							work[id] = entry;
+							entry.history = historyOld.slice(
+								historyOld.length >=
+									StreamPlayer.STATS_MAX_HISTORY
+									? 1
+									: 0,
+							);
+							entry.history.push(entry.value);
+							break;
+						case "value":
+						default:
+							work[id] = entry;
+							break;
+					}
+				}
+			}
+			if (global) {
+				this._globalStats = work;
+			} else {
+				this._debugStats = work;
+			}
+		};
 	};
 
 	private _setupPlayer = async () => {
@@ -126,10 +181,8 @@ export class StreamPlayer extends LitElement {
 			await this._streamReader.setup(this._streamProtocol);
 			await this._streamReader.start(
 				videoElem,
-				StreamPlayer._statsTimeout,
-				(stats) => {
-					this._debugStats = stats;
-				},
+				StreamPlayer.STATS_REFRESH_INTERVAL,
+				this._handleDebugStats(),
 				(e) => {
 					if (e && typeof e === "object") {
 						if ("message" in e) {
@@ -143,7 +196,7 @@ export class StreamPlayer extends LitElement {
 					console.error(e);
 					this._retryTimer = setTimeout(
 						this._setupPlayer,
-						StreamPlayer._retryTimeout,
+						StreamPlayer.RETRY_TIMEOUT,
 					);
 				},
 			);
@@ -160,7 +213,7 @@ export class StreamPlayer extends LitElement {
 			console.error(e);
 			this._retryTimer = setTimeout(
 				this._setupPlayer,
-				StreamPlayer._retryTimeout,
+				StreamPlayer.RETRY_TIMEOUT,
 			);
 		}
 	};
@@ -200,6 +253,18 @@ export class StreamPlayer extends LitElement {
 					x: (e.composedPath()[0] as HTMLVideoElement).videoWidth,
 					y: (e.composedPath()[0] as HTMLVideoElement).videoHeight,
 				};
+				this._handleDebugStats(true)([
+					{
+						type: "value",
+						id: "statResolution",
+						key: "statResolution",
+						value: i18n(
+							"statResolutionValue",
+							this._videoResolution.x,
+							this._videoResolution.y,
+						),
+					},
+				]);
 				this._recalculateVideoFit();
 				this._videoInitState = PlayerState.READY;
 				this._errorMessage = "";
@@ -216,7 +281,7 @@ export class StreamPlayer extends LitElement {
 					} catch (e) {
 						console.error(e);
 					}
-				}, StreamPlayer._videoErrorTimeout);
+				}, StreamPlayer.VIDEO_ERROR_TIMEOUT);
 			}}"
 			@playing="${() => {
 				clearTimeout(this._videoErrorTimer);
@@ -291,7 +356,31 @@ export class StreamPlayer extends LitElement {
 		</media-settings-menu>`;
 	}
 
-	debugTemplate() {
+	private _debugTemplateEntries(stats: Record<string, StatTypesAll>) {
+		return Object.values(stats).map((val) => {
+			const label = html`<span class="debugLabel"
+				>${i18n(val.key)}</span
+			>`;
+			switch (val.type) {
+				case "graph":
+					return html`${label}<debug-graph
+							maxEntries=${StreamPlayer.STATS_MAX_HISTORY}
+							.values=${val.history}
+							fillColor="${val.graphColor}"
+							backgroundColor="${val.backgroundColor}"
+							?stdDevScale=${val.stdDevScale}
+						>
+							<span>${val.valueString}</span>
+						</debug-graph>`;
+				case "value":
+				default:
+					return html`${label}
+						<div>${val.value}</div>`;
+			}
+		});
+	}
+
+	private _debugTemplate() {
 		return html`<div
 				class="debugClose"
 				aria-hidden="${this._debugVisible}"
@@ -337,16 +426,13 @@ export class StreamPlayer extends LitElement {
 				</div>
 			</div>
 			<div class="debugInner">
-				${this._debugStats.length > 0
-					? this._debugStats.map((val) => {
-							return html`<p>
-								${i18n(
-									val.key,
-									...([] as any[]).concat(val.value),
-								)}
-							</p>`;
-						})
-					: html`<p>${i18n("statsUnavailable")}</p>`}
+				${Object.values(this._debugStats).length +
+					Object.values(this._globalStats).length >
+				0
+					? this._debugTemplateEntries(this._globalStats).concat(
+							this._debugTemplateEntries(this._debugStats),
+						)
+					: html`<div>${i18n("statsUnavailable")}</div>`}
 			</div>`;
 	}
 
@@ -470,7 +556,14 @@ export class StreamPlayer extends LitElement {
 		.debugInner {
 			--padding: 10px;
 			padding: var(--padding);
-			display: block;
+			display: grid;
+			grid-template-columns: repeat(2, auto);
+			--gap: 0.05cm;
+			gap: var(--gap);
+			grid-column-gap: calc(4 * var(--gap));
+		}
+		.debugLabel {
+			justify-self: end;
 		}
 		.debugClose {
 			--padding: 5px;
@@ -486,9 +579,6 @@ export class StreamPlayer extends LitElement {
 			position: relative;
 			width: 0.4cm;
 			height: 0.4cm;
-		}
-		.debugInner p {
-			margin: 0.05cm;
 		}
 	`;
 
@@ -515,7 +605,7 @@ export class StreamPlayer extends LitElement {
 							debug: true,
 						})}
 					>
-						${this.debugTemplate()}
+						${this._debugVisible ? this._debugTemplate() : ""}
 					</div>
 				</div>
 				<media-control-bar>

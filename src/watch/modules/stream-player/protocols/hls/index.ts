@@ -17,6 +17,7 @@ export class HLSReader extends GenericReader {
 
 	private loadTimer: NodeJS.Timeout | undefined = undefined;
 	private statsTimer: NodeJS.Timeout | undefined = undefined;
+	private bytesReceivedLast: number = 0;
 
 	private statsBuffer = {
 		bytesReceived: 0,
@@ -138,24 +139,48 @@ export class HLSReader extends GenericReader {
 
 	private processStats = async () => {
 		if (typeof this.childConf.onStats === "function") {
+			const bandwidth = this.childConf.statsInterval
+				? ((this.statsBuffer.bytesReceived - this.bytesReceivedLast) *
+						8) /
+					(this.childConf.statsInterval / 1000)
+				: 0;
+			this.bytesReceivedLast = this.statsBuffer.bytesReceived;
 			const statsObj: PlayerStats = [
 				{
 					type: "value",
+					id: "statBytesReceived",
 					key: "statBytesReceived",
-					value: [
-						prettyBytes(this.statsBuffer.bytesReceived),
-						this.statsBuffer.bytesReceived ?? 0,
-					],
+					value: `${prettyBytes(this.statsBuffer.bytesReceived, "iec")} (${this.statsBuffer.bytesReceived}B)`,
 				},
 				{
-					type: "value",
+					type: "graph",
+					id: "statBandwidth",
+					key: "statBandwidth",
+					history: [],
+					graphColor: "red",
+					backgroundColor: "black",
+					value: bandwidth,
+					valueString: prettyBytes(bandwidth, "iec_bits_per_second"),
+				},
+				{
+					type: "graph",
+					id: "statLatency",
 					key: "statLatency",
-					value: prettyMilliseconds(this.inst?.latency ?? 0),
+					history: [],
+					graphColor: "red",
+					backgroundColor: "black",
+					stdDevScale: true,
+					value: this.inst?.latency ?? 0,
+					valueString: prettyMilliseconds(this.inst?.latency ?? 0),
 				},
 				{
 					type: "value",
+					id: "statHlsReceived",
 					key: "statReceived",
-					value: prettyNumber(this.statsBuffer.fragsReceived),
+					value: i18n(
+						"fragCount",
+						prettyNumber(this.statsBuffer.fragsReceived),
+					),
 				},
 			];
 			this.childConf.onStats(statsObj);
