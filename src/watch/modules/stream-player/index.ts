@@ -202,6 +202,7 @@ export class StreamPlayer extends LitElement {
 						StreamPlayer.RETRY_TIMEOUT,
 					);
 				},
+				this._debugVisible,
 			);
 		} catch (e) {
 			if (e && typeof e === "object") {

@@ -74,19 +74,20 @@ export class StreamReader {
 		statsInterval: number,
 		onStats: (stats: PlayerStats) => void,
 		onError: (err: unknown) => void,
+		debugState: boolean,
 	) {
 		this.video = video;
 		this.statsInterval = statsInterval;
 		this.onStats = onStats;
 		this.onError = onError;
-		this._start();
+		this._start(debugState);
 	}
 
 	public getSupportedProtocols() {
 		return this.supportedProtocols;
 	}
 
-	private _start() {
+	private _start(debugState: boolean) {
 		switch (this.streamProtocol) {
 			case StreamProtocol.WebRTC:
 			case StreamProtocol.WebRTC_TCP:
@@ -146,6 +147,9 @@ export class StreamReader {
 						`No case for protocol ${this.streamProtocol}!`,
 					),
 				};
+		}
+		if (this.reader) {
+			this.reader.setDebugState(debugState);
 		}
 	}
 
