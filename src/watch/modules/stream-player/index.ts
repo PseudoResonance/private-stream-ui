@@ -171,6 +171,9 @@ export class StreamPlayer extends LitElement {
 
 	private _setupPlayer = async () => {
 		try {
+			if (this._streamReader) {
+				this._streamReader.close();
+			}
 			const videoElem = this.shadowRoot?.getElementById(
 				"html-player",
 			) as HTMLVideoElement | null;
@@ -241,7 +244,7 @@ export class StreamPlayer extends LitElement {
 		playerElem?.style.setProperty("aspect-ratio", `${videoRatio}/1`);
 	};
 
-	videoTemplate() {
+	private videoTemplate() {
 		return html`<video
 			slot="media"
 			id="html-player"
@@ -303,22 +306,35 @@ export class StreamPlayer extends LitElement {
 		></video>`;
 	}
 
-	settingsTemplate() {
+	private settingsTemplate() {
 		const supportedProtocols = this._streamReader.getSupportedProtocols();
+		const urlQuery = new URLSearchParams(window.location.search);
+		const secretOptions = urlQuery.get("secret") !== null;
 		return html`<media-settings-menu hidden anchor="auto">
 			<media-chrome-menu-item
 				@click="${() => {
 					this._debugVisible = !this._debugVisible;
+					this._debugStats = {};
+					if (this._streamReader) {
+						this._streamReader.setDebugState(this._debugVisible);
+					}
 				}}"
 				@keydown="${(e: KeyboardEvent) => {
-					if (e.key === "Enter" || e.key === " ")
+					if (e.key === "Enter" || e.key === " ") {
 						this._debugVisible = !this._debugVisible;
+						this._debugStats = {};
+						if (this._streamReader) {
+							this._streamReader.setDebugState(
+								this._debugVisible,
+							);
+						}
+					}
 				}}"
 			>
 				<span>${i18n("debug")}</span>
 			</media-chrome-menu-item>
 			<media-settings-menu-item>
-				${i18n("protocol")}
+				${i18n("latency")}
 				<media-chrome-menu
 					@change="${(e: Event) => {
 						try {
@@ -336,13 +352,27 @@ export class StreamPlayer extends LitElement {
 					slot="submenu"
 					hidden
 				>
-					<div slot="title">${i18n("protocol")}</div>
+					<div slot="title">${i18n("latency")}</div>
 					${Object.entries(StreamProtocol)
-						.filter(([_, v]) => supportedProtocols.includes(v))
-						.map(([k, v]) => {
+						.filter(([_, v]) => {
+							if (!supportedProtocols.includes(v)) return false;
+							else if (
+								secretOptions &&
+								v === StreamProtocol.WebRTC
+							)
+								return false;
+							else if (
+								!secretOptions &&
+								(v === StreamProtocol.WebRTC_UDP ||
+									v === StreamProtocol.WebRTC_TCP)
+							)
+								return false;
+							return true;
+						})
+						.map(([_, v]) => {
 							const item = createMenuItem({
 								type: "radio",
-								text: k.replaceAll("_", " "),
+								text: i18n(`latency_${v}`),
 								value: v,
 								checked: v === this._streamProtocol,
 							});
@@ -398,10 +428,23 @@ export class StreamPlayer extends LitElement {
 					aria-hidden="${this._debugVisible}"
 					@click="${() => {
 						this._debugVisible = false;
+						this._debugStats = {};
+						if (this._streamReader) {
+							this._streamReader.setDebugState(
+								this._debugVisible,
+							);
+						}
 					}}"
 					@keydown="${(e: KeyboardEvent) => {
-						if (e.key === "Enter" || e.key === " ")
+						if (e.key === "Enter" || e.key === " ") {
 							this._debugVisible = false;
+							this._debugStats = {};
+							if (this._streamReader) {
+								this._streamReader.setDebugState(
+									this._debugVisible,
+								);
+							}
+						}
 					}}"
 				>
 					<svg

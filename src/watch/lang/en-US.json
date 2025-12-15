@@ -12,6 +12,13 @@
 	"playerStateOffline": "Stream Unavailable",
 	"error": "Error: {0}",
 
+	"latency": "Latency",
+	"latency_webrtc-udp": "Lowest (WebRTC UDP)",
+	"latency_webrtc-tcp": "Low (WebRTC TCP)",
+	"latency_webrtc": "Low (WebRTC)",
+	"latency_llhls": "Medium (LL-HLS)",
+	"latency_hls": "High (HLS)",
+
 	"invalidState": "Invalid State: {0}",
 	"sdpMissing": "SDP Not Present",
 	"streamLocationInvalid": "Invalid Stream Location",
@@ -25,6 +32,8 @@
 	"statBandwidth": "Bandwidth:",
 	"statLatency": "Latency:",
 	"statJitter": "Jitter:",
+	"statProtocol": "Protocol:",
+	"statCodec": "Codecs:",
 	"statReceived": "Received:",
 	"statDiscarded": "Discarded:",
 	"statLost": "Lost:",

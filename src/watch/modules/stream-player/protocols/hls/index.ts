@@ -1,5 +1,5 @@
 import Hls, { ErrorTypes, type ErrorData } from "hls.js";
-import { GenericReader, type ReaderConf } from "../interface";
+import { GenericReader, PlayerState, type ReaderConf } from "../interface";
 import { StreamProtocol } from "..";
 import { i18n } from "../../../../../lang";
 import type { PlayerStats } from "../../types";
@@ -22,6 +22,7 @@ export class HLSReader extends GenericReader {
 	private statsBuffer = {
 		bytesReceived: 0,
 		fragsReceived: 0,
+		lowLatency: false,
 	};
 
 	constructor(conf: HLSReaderConf) {
@@ -58,6 +59,7 @@ export class HLSReader extends GenericReader {
 				if (typeof this.childConf.onStats === "function") {
 					this.statsBuffer.bytesReceived += data.payload.byteLength;
 					this.statsBuffer.fragsReceived += 1;
+					this.statsBuffer.lowLatency = data.part !== null;
 				}
 			});
 			this.childConf.videoElement.removeEventListener(
@@ -73,8 +75,7 @@ export class HLSReader extends GenericReader {
 				this.childConf.videoElement.src = "";
 				this.childConf.videoElement.srcObject = null;
 			} catch (_) {}
-			if (this.childConf.statsInterval)
-				this.inst.attachMedia(this.childConf.videoElement);
+			this.inst.attachMedia(this.childConf.videoElement);
 		} catch (err) {
 			this.handleError(err);
 		}
@@ -96,7 +97,11 @@ export class HLSReader extends GenericReader {
 	}
 
 	private onPlayListener = () => {
-		if (!this.statsTimer) {
+		if (
+			this.childConf.statsInterval &&
+			!this.statsTimer &&
+			this.state !== PlayerState.CLOSED
+		) {
 			this.statsTimer = setTimeout(
 				this.processStats,
 				this.childConf.statsInterval,
@@ -138,13 +143,14 @@ export class HLSReader extends GenericReader {
 	}
 
 	private processStats = async () => {
-		if (typeof this.childConf.onStats === "function") {
+		if (typeof this.childConf.onStats === "function" && this.debugState) {
 			const bandwidth = this.childConf.statsInterval
 				? ((this.statsBuffer.bytesReceived - this.bytesReceivedLast) *
 						8) /
 					(this.childConf.statsInterval / 1000)
 				: 0;
 			this.bytesReceivedLast = this.statsBuffer.bytesReceived;
+			const level = this.inst?.levels[this.inst.currentLevel];
 			const statsObj: PlayerStats = [
 				{
 					type: "value",
@@ -175,6 +181,18 @@ export class HLSReader extends GenericReader {
 				},
 				{
 					type: "value",
+					id: "statProtocol",
+					key: "statProtocol",
+					value: `HLS${this.statsBuffer.lowLatency ? " Low Latency" : ""}`,
+				},
+				{
+					type: "value",
+					id: "statCodec",
+					key: "statCodec",
+					value: `${level?.videoCodec ?? i18n("unknown")} ${level?.audioCodec ?? i18n("unknown")}`,
+				},
+				{
+					type: "value",
 					id: "statHlsReceived",
 					key: "statReceived",
 					value: i18n(
@@ -185,7 +203,7 @@ export class HLSReader extends GenericReader {
 			];
 			this.childConf.onStats(statsObj);
 		}
-		if (this.childConf.statsInterval)
+		if (this.childConf.statsInterval && this.state !== PlayerState.CLOSED)
 			this.statsTimer = setTimeout(
 				this.processStats,
 				this.childConf.statsInterval,

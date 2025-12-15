@@ -21,6 +21,7 @@ export interface ReaderConf {
 export abstract class GenericReader {
 	protected conf: ReaderConf;
 	protected state: PlayerState = PlayerState.INITIALIZING;
+	protected debugState: boolean = false;
 
 	constructor(conf: ReaderConf) {
 		this.conf = conf;
@@ -32,6 +33,10 @@ export abstract class GenericReader {
 
 	public close() {
 		this.state = PlayerState.CLOSED;
+	}
+
+	public setDebugState(state: boolean) {
+		this.debugState = state;
 	}
 
 	protected handleError(err: unknown) {

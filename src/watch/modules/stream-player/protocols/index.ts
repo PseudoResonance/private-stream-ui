@@ -5,10 +5,11 @@ import { HLSReader } from "./hls/index.ts";
 import type { PlayerStats } from "../types.ts";
 
 export enum StreamProtocol {
+	HLS = "hls",
+	LL_HLS = "llhls",
+	WebRTC = "webrtc",
 	WebRTC_TCP = "webrtc-tcp",
 	WebRTC_UDP = "webrtc-udp",
-	LL_HLS = "llhls",
-	HLS = "hls",
 }
 
 export const DefaultProtocol = StreamProtocol.LL_HLS;
@@ -44,6 +45,7 @@ export class StreamReader {
 		this.backendConfig = (window as any).REMOTE_CONFIG;
 		for (const k of Object.values(StreamProtocol)) {
 			switch (k) {
+				case StreamProtocol.WebRTC:
 				case StreamProtocol.WebRTC_TCP:
 				case StreamProtocol.WebRTC_UDP:
 					if (WebRTCReader.supported()) {
@@ -86,6 +88,7 @@ export class StreamReader {
 
 	private _start() {
 		switch (this.streamProtocol) {
+			case StreamProtocol.WebRTC:
 			case StreamProtocol.WebRTC_TCP:
 			case StreamProtocol.WebRTC_UDP:
 				if (!this.backendConfig.webRtcUrl) {
@@ -143,6 +146,12 @@ export class StreamReader {
 						`No case for protocol ${this.streamProtocol}!`,
 					),
 				};
+		}
+	}
+
+	public setDebugState(state: boolean) {
+		if (this.reader) {
+			this.reader.setDebugState(state);
 		}
 	}
 

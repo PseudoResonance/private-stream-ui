@@ -17,6 +17,17 @@ interface SDPOffer {
 	medias: string[];
 }
 
+interface SDPOfferMedia {
+	id: string;
+	type: string;
+	ssrc: string;
+	codec: string;
+}
+
+interface SDPOfferData {
+	[key: string]: SDPOfferMedia;
+}
+
 interface WebRTCReaderConf extends ReaderConf {
 	onTrack: (evt: RTCTrackEvent) => void;
 }
@@ -27,6 +38,10 @@ export class WebRTCReader extends GenericReader {
 	private offerData: SDPOffer | null = null;
 	private sessionUrl: string | null = null;
 	private queuedCandidates: RTCIceCandidate[] = [];
+	/**
+	 * Offer data for each media type, organized by ID
+	 */
+	private sdpOfferData: SDPOfferData | null = null;
 
 	private statsTimer: NodeJS.Timeout | undefined = undefined;
 	private bytesReceivedLast: number = 0;
@@ -139,11 +154,6 @@ export class WebRTCReader extends GenericReader {
 		this.offerData = WebRTCReader.parseOffer(offer.sdp);
 
 		await this.peerConnection.setLocalDescription(offer);
-		if (this.childConf.statsInterval)
-			this.statsTimer = setTimeout(
-				this.processStats,
-				this.childConf.statsInterval,
-			);
 		return offer.sdp;
 	}
 
@@ -204,14 +214,20 @@ export class WebRTCReader extends GenericReader {
 
 	private static async filterAnswer(
 		answer: string,
-		protocol?: string,
+		protocol?: StreamProtocol,
 	): Promise<string> {
+		if (protocol === StreamProtocol.WebRTC) {
+			// Skip for general WebRTC
+			return answer;
+		}
+		const protocolStr =
+			protocol === StreamProtocol.WebRTC_TCP ? "tcp" : "udp";
 		const ret = answer
 			.split("\r\n")
 			.map((line) => {
 				if (line.startsWith("a=candidate")) {
 					const lineSplit = line.split(" ");
-					if (lineSplit[2]?.toLowerCase() !== protocol) {
+					if (lineSplit[2]?.toLowerCase() !== protocolStr) {
 						return undefined;
 					}
 				}
@@ -220,6 +236,49 @@ export class WebRTCReader extends GenericReader {
 			.filter((line) => line !== undefined)
 			.join("\r\n");
 		return ret;
+	}
+
+	private async parseAnswer(answer: string) {
+		const data: SDPOfferData = {};
+		let media: SDPOfferMedia | null = null;
+		for (const line of answer.split("\r\n")) {
+			if (!media && !line.startsWith("m=")) {
+				continue;
+			} else if (line.startsWith("m=")) {
+				const split = line.slice(2).split(" ");
+				if (split.length < 4) {
+					console.error(
+						`Unable to parse media description "${line}"`,
+					);
+					continue;
+				}
+				media = {
+					id: split[3] as string,
+					type: split[0] as string,
+					ssrc: "",
+					codec: "",
+				};
+				data[media.id] = media;
+			} else if (media && line.startsWith("a=")) {
+				const attribute = line.slice(2);
+				if (attribute.startsWith(`rtpmap:${media.id}`)) {
+					const split = attribute.split(" ");
+					if (split.length < 2) {
+						console.error(`Unable to parse media codec "${line}"`);
+						continue;
+					}
+					media.codec = split[1] as string;
+				} else if (attribute.startsWith("ssrc:")) {
+					const split = attribute.slice("ssrc:".length).split(" ");
+					if (split.length < 1) {
+						console.error(`Unable to parse media SSRC "${line}"`);
+						continue;
+					}
+					media.ssrc = split[0] as string;
+				}
+			}
+		}
+		this.sdpOfferData = data;
 	}
 
 	private async setAnswer(answer: string) {
@@ -231,13 +290,13 @@ export class WebRTCReader extends GenericReader {
 			throw new Error(i18n("notConnected"));
 		}
 
+		await this.parseAnswer(answer);
+
 		await this.peerConnection.setRemoteDescription(
 			new RTCSessionDescription({
 				sdp: await WebRTCReader.filterAnswer(
 					answer,
-					this.conf.protocol === StreamProtocol.WebRTC_TCP
-						? "tcp"
-						: "udp",
+					this.conf.protocol,
 				),
 				type: "answer",
 			}),
@@ -280,9 +339,7 @@ export class WebRTCReader extends GenericReader {
 			body: WebRTCReader.generateSdpFragment(
 				this.offerData,
 				candidates,
-				this.conf.protocol === StreamProtocol.WebRTC_TCP
-					? "tcp"
-					: "udp",
+				this.conf.protocol,
 			),
 			headers: {
 				"Content-Type": "application/trickle-ice-sdpfrag",
@@ -308,11 +365,26 @@ export class WebRTCReader extends GenericReader {
 	private static generateSdpFragment(
 		offerData: SDPOffer,
 		candidates: RTCIceCandidate[],
-		protocol?: string,
+		protocol?: StreamProtocol,
 	) {
+		const validProtocols = [];
+		switch (protocol) {
+			case StreamProtocol.WebRTC:
+				validProtocols.push("tcp");
+				validProtocols.push("udp");
+				break;
+			case StreamProtocol.WebRTC_TCP:
+				validProtocols.push("tcp");
+				break;
+			case StreamProtocol.WebRTC_UDP:
+				validProtocols.push("udp");
+				break;
+			default:
+				throw new Error(`Invalid protocol ${protocol}`);
+		}
 		const candidatesByMedia: { [key: string]: RTCIceCandidate[] } = {};
 		for (const candidate of candidates) {
-			if (protocol && candidate.protocol !== protocol) {
+			if (validProtocols.includes(candidate.protocol as string)) {
 				continue;
 			}
 			const mid = candidate.sdpMLineIndex;
@@ -365,6 +437,16 @@ export class WebRTCReader extends GenericReader {
 	}
 
 	private onTrack(evt: RTCTrackEvent) {
+		if (
+			this.childConf.statsInterval &&
+			this.state !== PlayerState.CLOSED &&
+			!this.statsTimer
+		) {
+			this.statsTimer = setTimeout(
+				this.processStats,
+				this.childConf.statsInterval,
+			);
+		}
 		try {
 			if (typeof this.childConf?.onTrack === "function") {
 				this.childConf.onTrack(evt);
@@ -389,7 +471,7 @@ export class WebRTCReader extends GenericReader {
 	}
 
 	private processStats = async () => {
-		if (typeof this.childConf.onStats === "function") {
+		if (typeof this.childConf.onStats === "function" && this.debugState) {
 			try {
 				let stats;
 				if (this.peerConnection) {
@@ -408,25 +490,85 @@ export class WebRTCReader extends GenericReader {
 						let packetsReceived = 0;
 						let packetsDiscarded = 0;
 						let packetsLost = 0;
+						let localCandidateId = "";
+						let videoCodec = "";
+						let audioCodec = "";
 						(stats as RTCStatsReport).forEach((entry) => {
 							if (entry.type === "inbound-rtp") {
-								bytesReceived += entry.bytesReceived;
-								jitterArr.push(entry.jitter);
-								jitterBufferArr.push(
-									Math.max(entry.jitterBufferTargetDelay, 0) /
-										entry.jitterBufferEmittedCount,
+								bytesReceived += WebRTCReader.safeNumber(
+									entry.bytesReceived,
 								);
+								if ("jitter" in entry && !isNaN(entry.jitter)) {
+									jitterArr.push(entry.jitter);
+								}
+								if (
+									"jitterBufferTargetDelay" in entry &&
+									!isNaN(entry.jitterBufferTargetDelay) &&
+									"jitterBufferEmittedCount" in entry &&
+									!isNaN(entry.jitterBufferEmittedCount) &&
+									entry.jitterBufferEmittedCount !== 0
+								) {
+									jitterBufferArr.push(
+										Math.max(
+											entry.jitterBufferTargetDelay,
+											0,
+										) / entry.jitterBufferEmittedCount,
+									);
+								}
 								packetsReceived += Math.max(
-									entry.packetsReceived,
+									WebRTCReader.safeNumber(
+										entry.packetsReceived,
+									),
 									0,
 								);
 								packetsDiscarded += Math.max(
-									entry.packetsDiscarded,
+									WebRTCReader.safeNumber(
+										entry.packetsDiscarded,
+									),
 									0,
 								);
-								packetsLost += Math.max(entry.packetsLost, 0);
+								packetsLost += Math.max(
+									WebRTCReader.safeNumber(entry.packetsLost),
+									0,
+								);
+								if ("ssrc" in entry && this.sdpOfferData) {
+									for (const media of Object.values(
+										this.sdpOfferData,
+									)) {
+										if (media.ssrc === String(entry.ssrc)) {
+											switch (media.type) {
+												case "video":
+													videoCodec = media.codec;
+													break;
+												case "audio":
+													audioCodec = media.codec;
+													break;
+												default:
+													console.error(
+														`Unsupported SDP offer codec ${media.type}`,
+													);
+													break;
+											}
+										}
+									}
+								}
+							} else if (entry.type === "candidate-pair") {
+								if (
+									("selected" in entry && entry.selected) ||
+									(!("selected" in entry) && entry.writable)
+								) {
+									localCandidateId = entry.localCandidateId;
+								}
 							}
 						});
+						let protocol = stats.get(localCandidateId)?.protocol;
+						if (protocol === "udp") {
+							protocol = "UDP";
+						} else if (protocol === "tcp") {
+							protocol = "TCP";
+						} else {
+							protocol = i18n("unknown");
+						}
 						const latency =
 							jitterBufferArr.reduce((a, b) => a + b, 0) /
 							jitterBufferArr.length;
@@ -482,6 +624,18 @@ export class WebRTCReader extends GenericReader {
 							},
 							{
 								type: "value",
+								id: "statProtocol",
+								key: "statProtocol",
+								value: `WebRTC ${protocol}`,
+							},
+							{
+								type: "value",
+								id: "statCodec",
+								key: "statCodec",
+								value: `${videoCodec ?? i18n("unknown")} ${audioCodec ?? i18n("unknown")}`,
+							},
+							{
+								type: "value",
 								id: "statPacketsReceived",
 								key: "statReceived",
 								value: i18n(
@@ -515,10 +669,15 @@ export class WebRTCReader extends GenericReader {
 				console.error("Error while fetching stats", e);
 			}
 		}
-		if (this.childConf.statsInterval)
+		if (this.childConf.statsInterval && this.state !== PlayerState.CLOSED)
 			this.statsTimer = setTimeout(
 				this.processStats,
 				this.childConf.statsInterval,
 			);
 	};
+
+	private static safeNumber(val: number | undefined | null) {
+		if (typeof val === "number" && !isNaN(val)) return val;
+		return 0;
+	}
 }

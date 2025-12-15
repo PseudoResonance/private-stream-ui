@@ -44,6 +44,7 @@ export class DebugGraph extends LitElement {
 		if (this._canvasHistory != this.values) {
 			const min = this.stdDevScale ? Math.min(...this.values) : 0;
 			const max = Math.max(...this.values) - min;
+
 			this._ctx.fillStyle = this.backgroundColor;
 			this._ctx.fillRect(
 				0,
@@ -51,10 +52,12 @@ export class DebugGraph extends LitElement {
 				this._ctx.canvas.width,
 				this._ctx.canvas.height,
 			);
+
 			this._ctx.fillStyle = this.fillColor;
 			for (const [i, v] of this.values.entries()) {
 				let height;
 				if (this.stdDevScale) {
+					// Graph is scaled around all values, to better show minute changes
 					if (max === 0) {
 						height = Math.round(this._ctx.canvas.height / 2);
 					} else {
@@ -63,14 +66,16 @@ export class DebugGraph extends LitElement {
 						);
 					}
 				} else {
+					// Default 0-max scaling
 					if (max === 0) {
-						height = this._ctx.canvas.height;
+						height = 0;
 					} else {
 						height = Math.round(
 							(v / max) * this._ctx.canvas.height,
 						);
 					}
 				}
+				// Ensure at least 1 pixel is drawn
 				height = -Math.max(height, 1);
 				this._ctx.fillRect(
 					i * DebugGraph.WIDTH_FACTOR,
