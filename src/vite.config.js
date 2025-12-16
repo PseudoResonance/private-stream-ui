@@ -16,7 +16,6 @@ export default defineConfig(({ _, mode }) => {
 				},
 			},
 		},
-		root: "src",
 		server: {
 			allowedHosts: mode === "development" ? true : undefined,
 		},

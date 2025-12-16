@@ -4,6 +4,7 @@ services:
     ports:
       - "8080:8080"
     env_file: "config.env"
+    read_only: true
     environment:
       NODE_ENV: "production"
       CONFIG_PATH: "/config.json"
