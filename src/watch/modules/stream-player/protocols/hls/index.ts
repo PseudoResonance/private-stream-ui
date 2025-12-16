@@ -193,10 +193,10 @@ export class HLSReader extends GenericReader {
 				},
 				{
 					type: "value",
-					id: "statHlsReceived",
-					key: "statReceived",
+					id: "statFragments",
+					key: "statFragments",
 					value: i18n(
-						"fragCount",
+						"receivedCount",
 						prettyNumber(this.statsBuffer.fragsReceived),
 					),
 				},

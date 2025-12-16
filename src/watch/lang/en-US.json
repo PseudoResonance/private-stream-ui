@@ -34,11 +34,10 @@
 	"statJitter": "Jitter:",
 	"statProtocol": "Protocol:",
 	"statCodec": "Codecs:",
-	"statReceived": "Received:",
-	"statDiscarded": "Discarded:",
-	"statLost": "Lost:",
+	"statPackets": "Packets:",
+	"statFragments": "Fragments:",
 	"statResolution": "Resolution:",
 	"statResolutionValue": "{0}px × {1}px",
-	"fragCount": "{0} Fragments",
-	"packetCount": "{0} Packets"
+	"receivedCount": "{0} Received",
+	"packetReceivedDiscardedLostCount": "{0} ({1} Discarded - {2} Lost)"
 }

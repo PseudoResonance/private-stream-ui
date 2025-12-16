@@ -53,10 +53,7 @@ app.get("/healthz", (_, res) => res.send("ok"));
 apiManager.setup(requiresAuthWrapper);
 
 ViteExpress.config({
-	inlineViteConfig: {
-		root: "src",
-		build: { outDir: "../dist" },
-	},
+	viteConfigFile: "./src/vite.config.js",
 	transformer: (html: string, req: express.Request) => {
 		const userData: UserData = {
 			id: req.oidc?.user?.sub,

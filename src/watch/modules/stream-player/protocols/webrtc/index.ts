@@ -636,28 +636,12 @@ export class WebRTCReader extends GenericReader {
 							},
 							{
 								type: "value",
-								id: "statPacketsReceived",
-								key: "statReceived",
+								id: "statPackets",
+								key: "statPackets",
 								value: i18n(
-									"packetCount",
+									"packetReceivedDiscardedLostCount",
 									prettyNumber(packetsReceived),
-								),
-							},
-							{
-								type: "value",
-								id: "statPacketsDiscarded",
-								key: "statDiscarded",
-								value: i18n(
-									"packetCount",
 									prettyNumber(packetsDiscarded),
-								),
-							},
-							{
-								type: "value",
-								id: "statPacketsLost",
-								key: "statLost",
-								value: i18n(
-									"packetCount",
 									prettyNumber(packetsLost),
 								),
 							},
