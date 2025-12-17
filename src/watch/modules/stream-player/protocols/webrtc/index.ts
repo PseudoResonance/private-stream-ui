@@ -74,7 +74,10 @@ export class WebRTCReader extends GenericReader {
 	}
 
 	public static supported(): boolean {
-		return true;
+		if ("RTCRtpReceiver" in window) {
+			return true;
+		}
+		return false;
 	}
 
 	private async requestICEServers(): Promise<ICEServerList[]> {
@@ -493,7 +496,7 @@ export class WebRTCReader extends GenericReader {
 						let localCandidateId = "";
 						let videoCodec = "";
 						let audioCodec = "";
-						(stats as RTCStatsReport).forEach((entry) => {
+						(stats as RTCStatsReport).forEach(async (entry) => {
 							if (entry.type === "inbound-rtp") {
 								bytesReceived += WebRTCReader.safeNumber(
 									entry.bytesReceived,
@@ -553,11 +556,27 @@ export class WebRTCReader extends GenericReader {
 									}
 								}
 							} else if (entry.type === "candidate-pair") {
-								if (
-									("selected" in entry && entry.selected) ||
-									(!("selected" in entry) && entry.writable)
+								if ("selected" in entry) {
+									if (entry.selected) {
+										localCandidateId =
+											entry.localCandidateId;
+									}
+								} else if (
+									"currentRoundTripTime" in entry &&
+									"nominated" in entry
 								) {
-									localCandidateId = entry.localCandidateId;
+									if (
+										entry.currentRoundTripTime > 0 &&
+										entry.nominated
+									) {
+										localCandidateId =
+											entry.localCandidateId;
+									}
+								} else if ("writable" in entry) {
+									if (entry.writable) {
+										localCandidateId =
+											entry.localCandidateId;
+									}
 								}
 							}
 						});
@@ -663,5 +682,57 @@ export class WebRTCReader extends GenericReader {
 	private static safeNumber(val: number | undefined | null) {
 		if (typeof val === "number" && !isNaN(val)) return val;
 		return 0;
+	}
+
+	private static codecMap: Record<string, string> = {
+		h264: "video/h264",
+		h265: "video/h265",
+		vp8: "video/vp8",
+		vp9: "video/vp9",
+		av1: "video/av1",
+		opus: "audio/opus",
+	};
+
+	public static async listSupportedProtocols(
+		codecs: string[],
+	): Promise<StreamProtocol[]> {
+		const ret = [
+			StreamProtocol.WebRTC,
+			StreamProtocol.WebRTC_TCP,
+			StreamProtocol.WebRTC_UDP,
+		];
+		if (codecs.length === 0) {
+			return ret;
+		}
+		let videoSupported = false;
+		let audioSupported = false;
+		codecs = codecs
+			.map((v) => {
+				v = v.toLocaleLowerCase();
+				if (v in WebRTCReader.codecMap) {
+					return WebRTCReader.codecMap[v];
+				}
+				console.error(`Unknown codec ${v}`);
+				return undefined;
+			})
+			.filter((v) => v !== undefined);
+		for (const codec of RTCRtpReceiver.getCapabilities("video")?.codecs ??
+			[]) {
+			if (codecs.includes(codec.mimeType.toLocaleLowerCase())) {
+				videoSupported = true;
+				break;
+			}
+		}
+		for (const codec of RTCRtpReceiver.getCapabilities("audio")?.codecs ??
+			[]) {
+			if (codecs.includes(codec.mimeType.toLocaleLowerCase())) {
+				audioSupported = true;
+				break;
+			}
+		}
+		if (audioSupported && videoSupported) {
+			return ret;
+		}
+		return [];
 	}
 }

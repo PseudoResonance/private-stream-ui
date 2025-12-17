@@ -3,6 +3,7 @@ import type { BackendConfig } from "../../../../types.ts";
 import type { GenericReader } from "./interface.ts";
 import { HLSReader } from "./hls/index.ts";
 import type { PlayerStats } from "../types.ts";
+import { i18n } from "../../../../lang.ts";
 
 export enum StreamProtocol {
 	HLS = "hls",
@@ -12,7 +13,13 @@ export enum StreamProtocol {
 	WebRTC_UDP = "webrtc-udp",
 }
 
-export const DefaultProtocol = StreamProtocol.LL_HLS;
+export const DefaultProtocols = [
+	StreamProtocol.LL_HLS,
+	StreamProtocol.WebRTC,
+	StreamProtocol.HLS,
+	StreamProtocol.WebRTC_UDP,
+	StreamProtocol.WebRTC_TCP,
+];
 
 export function streamProtocolFromString(
 	protocol: string | undefined | null,
@@ -23,12 +30,13 @@ export function streamProtocolFromString(
 	) {
 		return protocol as StreamProtocol;
 	} else {
-		return DefaultProtocol;
+		return DefaultProtocols[0] as StreamProtocol;
 	}
 }
 
 export class StreamReader {
-	private streamProtocol: StreamProtocol = DefaultProtocol;
+	private streamProtocol: StreamProtocol =
+		DefaultProtocols[0] as StreamProtocol;
 
 	private backendConfig: BackendConfig = {};
 
@@ -39,30 +47,8 @@ export class StreamReader {
 	private onStats: (stats: PlayerStats) => void = () => {};
 	private onError: (err: unknown) => void = () => {};
 
-	private supportedProtocols: StreamProtocol[] = [];
-
 	constructor() {
 		this.backendConfig = (window as any).REMOTE_CONFIG;
-		for (const k of Object.values(StreamProtocol)) {
-			switch (k) {
-				case StreamProtocol.WebRTC:
-				case StreamProtocol.WebRTC_TCP:
-				case StreamProtocol.WebRTC_UDP:
-					if (WebRTCReader.supported()) {
-						this.supportedProtocols.push(k);
-					}
-					break;
-				case StreamProtocol.LL_HLS:
-				case StreamProtocol.HLS:
-					if (HLSReader.supported()) {
-						this.supportedProtocols.push(k);
-					}
-					break;
-				default:
-					console.error(`No case for protocol ${k}!`);
-					break;
-			}
-		}
 	}
 
 	public async setup(streamProtocol: StreamProtocol) {
@@ -83,10 +69,6 @@ export class StreamReader {
 		this._start(debugState);
 	}
 
-	public getSupportedProtocols() {
-		return this.supportedProtocols;
-	}
-
 	private _start(debugState: boolean) {
 		switch (this.streamProtocol) {
 			case StreamProtocol.WebRTC:
@@ -94,7 +76,7 @@ export class StreamReader {
 			case StreamProtocol.WebRTC_UDP:
 				if (!this.backendConfig.webRtcUrl) {
 					throw {
-						message: "Protocol Not Available",
+						message: i18n("playerStateOffline"),
 						error: new Error(
 							`Protocol ${this.streamProtocol} is not available for this stream`,
 						),
@@ -119,7 +101,7 @@ export class StreamReader {
 			case StreamProtocol.HLS:
 				if (!this.backendConfig.hlsUrl) {
 					throw {
-						message: "Protocol Not Available",
+						message: i18n("playerStateOffline"),
 						error: new Error(
 							`Protocol ${this.streamProtocol} is not available for this stream`,
 						),
@@ -135,14 +117,14 @@ export class StreamReader {
 					});
 				} else {
 					throw {
-						message: "Unable to start player",
+						message: i18n("playerStateOffline"),
 						error: new Error("Invalid video element"),
 					};
 				}
 				break;
 			default:
 				throw {
-					message: "Unable to start player",
+					message: i18n("playerStateOffline"),
 					error: new Error(
 						`No case for protocol ${this.streamProtocol}!`,
 					),
@@ -175,5 +157,33 @@ export class StreamReader {
 		if (this.reader) {
 			this.reader.pause();
 		}
+	}
+
+	public static async calculateSupportedProtocols(
+		codecs: string[],
+	): Promise<StreamProtocol[]> {
+		let protocols: StreamProtocol[] = [];
+		if (WebRTCReader.supported()) {
+			protocols = protocols.concat(
+				await WebRTCReader.listSupportedProtocols(codecs),
+			);
+		}
+		if (HLSReader.supported()) {
+			protocols = protocols.concat(
+				await HLSReader.listSupportedProtocols(codecs),
+			);
+		}
+		return protocols;
+	}
+
+	public static getBestProtocol(
+		validProtocols: StreamProtocol[],
+	): StreamProtocol | null {
+		for (const v of DefaultProtocols) {
+			if (validProtocols.includes(v)) {
+				return v;
+			}
+		}
+		return null;
 	}
 }

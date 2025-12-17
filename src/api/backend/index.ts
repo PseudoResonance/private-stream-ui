@@ -11,6 +11,8 @@ export default class ApiBackend {
 	private _setupResolve: (value: boolean | PromiseLike<boolean>) => void =
 		() => null;
 
+	public apiKey: string | null = null;
+
 	constructor() {
 		// Setup connection
 		this._conn = new SQL({
@@ -51,6 +53,11 @@ export default class ApiBackend {
 	public async setup() {
 		try {
 			await DBSchema.setup(this._conn);
+			const apiKey = await DBSchema.getApiKey(this._conn);
+			if (apiKey === null) {
+				throw new Error("Unable to fetch valid API key from database!");
+			}
+			this.apiKey = apiKey;
 			this._setupResolve(true);
 		} catch (e) {
 			console.error(

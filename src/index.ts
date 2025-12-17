@@ -78,6 +78,7 @@ ViteExpress.config({
 			}
 			if (config.options.thumbnailHttpsPort) {
 				configObj.thumbnailUrl = `${config.options.providerBase}:${config.options.thumbnailHttpsPort}/thumbnails/${streamId}.${config.options.thumbnailFormat ?? "webp"}${streamToken}`;
+				configObj.apiStatsUrl = `/api/v1/pathstats${streamToken}&path=${streamId}`;
 			}
 			return html.replace(
 				"<!-- HEAD-META-TEMPLATE -->",

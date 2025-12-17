@@ -17,7 +17,7 @@ import {
 	type VideoResolution,
 } from "./types.ts";
 import {
-	DefaultProtocol,
+	DefaultProtocols,
 	StreamProtocol,
 	streamProtocolFromString,
 	StreamReader,
@@ -29,13 +29,15 @@ import {
 import { classMap } from "lit/directives/class-map.js";
 import { i18n } from "../../../lang.ts";
 import "./modules-debug/graph";
+import type { BackendConfig } from "../../../types.ts";
+import type { PathPublicStatsObjectType } from "../../../api/endpoints/pathStats.ts";
 
 @customElement("stream-player")
 export class StreamPlayer extends LitElement {
 	/**
-	 * Timeout in ms before retrying video stream
+	 * Interval in ms before retrying video stream
 	 */
-	private static RETRY_TIMEOUT = 2000;
+	private static RETRY_INTERVAL = 2000;
 	/**
 	 * Interval in ms to pull new stats
 	 */
@@ -54,13 +56,15 @@ export class StreamPlayer extends LitElement {
 		this._streamProtocol = streamProtocolFromString(
 			localStorage.getItem("stream-protocol"),
 		);
+
 		const viewportResizeObserver = new ResizeObserver(() => {
 			this._recalculateVideoFit();
 		});
 		viewportResizeObserver.observe(this.offsetParent ?? this);
+
 		this._streamReader = new StreamReader();
 
-		window.addEventListener("load", this._setupPlayer);
+		window.addEventListener("load", this._checkRemoteState);
 		window.addEventListener("beforeunload", () => {
 			this._streamReader.close();
 		});
@@ -105,9 +109,11 @@ export class StreamPlayer extends LitElement {
 	@state()
 	private _videoResolution: VideoResolution = { x: 16, y: 9 };
 	@state()
-	private _streamProtocol: StreamProtocol;
+	private _streamProtocol: StreamProtocol | null;
 	@state()
-	private _debugVisible: boolean = false;
+	private _validProtocols: StreamProtocol[] = DefaultProtocols;
+	@state()
+	private _showDebugStats: boolean = false;
 	@state()
 	private _debugStats: Record<string, StatTypesAll> = {};
 
@@ -118,19 +124,55 @@ export class StreamPlayer extends LitElement {
 
 	private _videoErrorTimer: NodeJS.Timeout | undefined = undefined;
 
+	private _streamInfo: PathPublicStatsObjectType | undefined = undefined;
+
+	private _fetchStreamInfo = async () => {
+		try {
+			if (((window as any).REMOTE_CONFIG as BackendConfig)?.apiStatsUrl) {
+				const streamStats = await fetch(
+					((window as any).REMOTE_CONFIG as BackendConfig)
+						.apiStatsUrl as string,
+				);
+				if (streamStats.status !== 200) {
+					this._streamInfo = undefined;
+					return;
+				}
+				this._streamInfo = (await streamStats.json()).data;
+			}
+		} catch (e) {
+			console.error(`Error while fetching remote stream info\n${e}`);
+			this._streamInfo = undefined;
+		}
+	};
+
 	private _setErrorMessage = (msg: string) => {
 		this._errorMessage = html`${msg}<br />${i18n("retrying")}`;
 	};
 
-	private _setStreamProtocol = (protocol: StreamProtocol) => {
-		if (this._streamProtocol !== protocol) {
+	private _setStreamProtocol = (protocol: StreamProtocol | null) => {
+		if (
+			!protocol ||
+			(this._validProtocols.length > 0 &&
+				!(protocol in this._validProtocols))
+		) {
+			protocol = StreamReader.getBestProtocol(this._validProtocols);
+		}
+		if (!protocol) {
+			console.log(`No valid protocol to use!`);
+			this._setErrorMessage(i18n("deviceUnsupported"));
+			this._streamProtocol = protocol;
+			this._streamReader.close();
+			this._debugStats = {};
+			this._globalStats = {};
+			this._checkRemoteState();
+		} else if (this._streamProtocol !== protocol) {
 			console.log(`Switching to protocol ${protocol}`);
 			this._streamProtocol = protocol;
 			localStorage.setItem("stream-protocol", protocol);
 			this._streamReader.close();
 			this._debugStats = {};
 			this._globalStats = {};
-			this._setupPlayer();
+			this._checkRemoteState();
 		}
 	};
 
@@ -169,7 +211,64 @@ export class StreamPlayer extends LitElement {
 		};
 	};
 
-	private _setupPlayer = async () => {
+	private _checkRemoteState = async () => {
+		await this._fetchStreamInfo();
+		if (this._streamInfo) {
+			if (!this._streamInfo.ready) {
+				this._setErrorMessage(i18n("playerStateOffline"));
+				this._retryTimer = setTimeout(
+					this._checkRemoteState,
+					StreamPlayer.RETRY_INTERVAL,
+				);
+			} else {
+				this._validProtocols =
+					await StreamReader.calculateSupportedProtocols(
+						this._streamInfo.codecs,
+					);
+				this.updateProtocolSettings();
+				if (
+					!this._streamProtocol ||
+					!(this._streamProtocol in this._validProtocols)
+				) {
+					this._streamProtocol = StreamReader.getBestProtocol(
+						this._validProtocols,
+					);
+				}
+				if (!this._streamProtocol) {
+					this._setErrorMessage(i18n("deviceUnsupported"));
+					this._retryTimer = setTimeout(
+						this._checkRemoteState,
+						StreamPlayer.RETRY_INTERVAL,
+					);
+				} else {
+					await this._setupPlayer(this._streamProtocol);
+				}
+			}
+		} else {
+			console.error("Unable to fetch remote stats, trying anyways...");
+			this._validProtocols =
+				await StreamReader.calculateSupportedProtocols([]);
+			if (
+				!this._streamProtocol ||
+				!(this._streamProtocol in this._validProtocols)
+			) {
+				this._streamProtocol = StreamReader.getBestProtocol(
+					this._validProtocols,
+				);
+			}
+			if (!this._streamProtocol) {
+				this._setErrorMessage(i18n("deviceUnsupported"));
+				this._retryTimer = setTimeout(
+					this._checkRemoteState,
+					StreamPlayer.RETRY_INTERVAL,
+				);
+			} else {
+				await this._setupPlayer(this._streamProtocol);
+			}
+		}
+	};
+
+	private _setupPlayer = async (protocol: StreamProtocol) => {
 		try {
 			if (this._streamReader) {
 				this._streamReader.close();
@@ -181,7 +280,7 @@ export class StreamPlayer extends LitElement {
 				console.error("Unable to find video element!");
 				return;
 			}
-			await this._streamReader.setup(this._streamProtocol);
+			await this._streamReader.setup(protocol);
 			await this._streamReader.start(
 				videoElem,
 				StreamPlayer.STATS_REFRESH_INTERVAL,
@@ -198,11 +297,11 @@ export class StreamPlayer extends LitElement {
 					}
 					console.error(e);
 					this._retryTimer = setTimeout(
-						this._setupPlayer,
-						StreamPlayer.RETRY_TIMEOUT,
+						this._checkRemoteState,
+						StreamPlayer.RETRY_INTERVAL,
 					);
 				},
-				this._debugVisible,
+				this._showDebugStats,
 			);
 		} catch (e) {
 			if (e && typeof e === "object") {
@@ -216,8 +315,8 @@ export class StreamPlayer extends LitElement {
 			}
 			console.error(e);
 			this._retryTimer = setTimeout(
-				this._setupPlayer,
-				StreamPlayer.RETRY_TIMEOUT,
+				this._checkRemoteState,
+				StreamPlayer.RETRY_INTERVAL,
 			);
 		}
 	};
@@ -281,7 +380,7 @@ export class StreamPlayer extends LitElement {
 						this._videoErrorTimer = undefined;
 						console.error("Video stalled, assuming failed");
 						this._setErrorMessage(i18n("playerStateOffline"));
-						this._setupPlayer();
+						this._checkRemoteState();
 					} catch (e) {
 						console.error(e);
 					}
@@ -307,26 +406,71 @@ export class StreamPlayer extends LitElement {
 		></video>`;
 	}
 
-	private settingsTemplate() {
-		const supportedProtocols = this._streamReader.getSupportedProtocols();
+	private updateProtocolSettings() {
+		const elem = this.shadowRoot?.getElementById("protocolMenu");
 		const urlQuery = new URLSearchParams(window.location.search);
 		const secretOptions = urlQuery.get("secret") !== null;
+		for (const child of elem?.children ?? []) {
+			if (
+				child.nodeName.toLocaleLowerCase() === "media-chrome-menu-item"
+			) {
+				child.remove();
+			}
+		}
+		// Delete elements again because of MediaChrome modifying them...
+		for (const child of elem?.children ?? []) {
+			if (
+				child.nodeName.toLocaleLowerCase() === "media-chrome-menu-item"
+			) {
+				child.remove();
+			}
+		}
+		//TODO close menu
+		const items = Object.entries(StreamProtocol)
+			.filter(([_, v]) => {
+				if (!this._validProtocols.includes(v)) return false;
+				else if (secretOptions && v === StreamProtocol.WebRTC)
+					return false;
+				else if (
+					!secretOptions &&
+					(v === StreamProtocol.WebRTC_UDP ||
+						v === StreamProtocol.WebRTC_TCP)
+				)
+					return false;
+				return true;
+			})
+			.map(([_, v]) => {
+				const item = createMenuItem({
+					type: "radio",
+					text: i18n(`latency_${v}`),
+					value: v,
+					checked: v === this._streamProtocol,
+				});
+				item.prepend(createIndicator(this, "checked-indicator"));
+				return item;
+			});
+		for (const item of items) {
+			elem?.appendChild(item);
+		}
+	}
+
+	private settingsTemplate() {
 		return html`<media-settings-menu hidden anchor="auto">
 			<media-chrome-menu-item
 				@click="${() => {
-					this._debugVisible = !this._debugVisible;
+					this._showDebugStats = !this._showDebugStats;
 					this._debugStats = {};
 					if (this._streamReader) {
-						this._streamReader.setDebugState(this._debugVisible);
+						this._streamReader.setDebugState(this._showDebugStats);
 					}
 				}}"
 				@keydown="${(e: KeyboardEvent) => {
 					if (e.key === "Enter" || e.key === " ") {
-						this._debugVisible = !this._debugVisible;
+						this._showDebugStats = !this._showDebugStats;
 						this._debugStats = {};
 						if (this._streamReader) {
 							this._streamReader.setDebugState(
-								this._debugVisible,
+								this._showDebugStats,
 							);
 						}
 					}
@@ -347,41 +491,14 @@ export class StreamPlayer extends LitElement {
 							);
 						} catch (e) {
 							console.error(e);
-							this._setStreamProtocol(DefaultProtocol);
+							this._setStreamProtocol(null);
 						}
 					}}"
 					slot="submenu"
 					hidden
+					id="protocolMenu"
 				>
 					<div slot="title">${i18n("latency")}</div>
-					${Object.entries(StreamProtocol)
-						.filter(([_, v]) => {
-							if (!supportedProtocols.includes(v)) return false;
-							else if (
-								secretOptions &&
-								v === StreamProtocol.WebRTC
-							)
-								return false;
-							else if (
-								!secretOptions &&
-								(v === StreamProtocol.WebRTC_UDP ||
-									v === StreamProtocol.WebRTC_TCP)
-							)
-								return false;
-							return true;
-						})
-						.map(([_, v]) => {
-							const item = createMenuItem({
-								type: "radio",
-								text: i18n(`latency_${v}`),
-								value: v,
-								checked: v === this._streamProtocol,
-							});
-							item.prepend(
-								createIndicator(this, "checked-indicator"),
-							);
-							return item;
-						})}
 				</media-chrome-menu>
 			</media-settings-menu-item>
 		</media-settings-menu>`;
@@ -414,7 +531,7 @@ export class StreamPlayer extends LitElement {
 	private _debugTemplate() {
 		return html`<div
 				class="debugClose"
-				aria-hidden="${this._debugVisible}"
+				aria-hidden="${this._showDebugStats}"
 				role="dialog"
 				aria-label="${i18n("debugInfo")}"
 				aria-modal="false"
@@ -425,24 +542,24 @@ export class StreamPlayer extends LitElement {
 					tabindex="0"
 					aria-pressed="false"
 					aria-label="${i18n("close")}"
-					focusable="${this._debugVisible}"
-					aria-hidden="${this._debugVisible}"
+					focusable="${this._showDebugStats}"
+					aria-hidden="${this._showDebugStats}"
 					@click="${() => {
-						this._debugVisible = false;
+						this._showDebugStats = false;
 						this._debugStats = {};
 						if (this._streamReader) {
 							this._streamReader.setDebugState(
-								this._debugVisible,
+								this._showDebugStats,
 							);
 						}
 					}}"
 					@keydown="${(e: KeyboardEvent) => {
 						if (e.key === "Enter" || e.key === " ") {
-							this._debugVisible = false;
+							this._showDebugStats = false;
 							this._debugStats = {};
 							if (this._streamReader) {
 								this._streamReader.setDebugState(
-									this._debugVisible,
+									this._showDebugStats,
 								);
 							}
 						}
@@ -621,6 +738,7 @@ export class StreamPlayer extends LitElement {
 			pointer-events: initial;
 			touch-action: initial;
 			position: relative;
+			cursor: pointer;
 			width: 0.4cm;
 			height: 0.4cm;
 		}
@@ -645,11 +763,11 @@ export class StreamPlayer extends LitElement {
 				<div class="debugWrapper">
 					<div
 						class=${classMap({
-							active: this._debugVisible,
+							active: this._showDebugStats,
 							debug: true,
 						})}
 					>
-						${this._debugVisible ? this._debugTemplate() : ""}
+						${this._showDebugStats ? this._debugTemplate() : ""}
 					</div>
 				</div>
 				<media-control-bar>

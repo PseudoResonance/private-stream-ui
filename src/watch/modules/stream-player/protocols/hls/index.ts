@@ -209,4 +209,107 @@ export class HLSReader extends GenericReader {
 				this.childConf.statsInterval,
 			);
 	};
+
+	//TODO better codec validation
+	private static codecMap: Record<string, MediaDecodingConfiguration> = {
+		h264: {
+			type: "media-source",
+			video: {
+				contentType: `video/mp4; codecs="avc1.4d002a"`,
+				width: 640,
+				height: 480,
+				framerate: 30,
+				bitrate: 2000,
+			},
+		},
+		h265: {
+			type: "media-source",
+			video: {
+				contentType: `video/mp4; codecs="hvc1.1.6.L30"`,
+				width: 640,
+				height: 480,
+				framerate: 30,
+				bitrate: 2000,
+			},
+		},
+		vp8: {
+			type: "media-source",
+			video: {
+				contentType: `video/webm; codecs="vp8"`,
+				width: 640,
+				height: 480,
+				framerate: 30,
+				bitrate: 2000,
+			},
+		},
+		vp9: {
+			type: "media-source",
+			video: {
+				contentType: `video/webm; codecs="vp9"`,
+				width: 640,
+				height: 480,
+				framerate: 30,
+				bitrate: 2000,
+			},
+		},
+		av1: {
+			type: "media-source",
+			video: {
+				contentType: `video/webm; codecs="av1"`,
+				width: 640,
+				height: 480,
+				framerate: 30,
+				bitrate: 2000,
+			},
+		},
+		opus: {
+			type: "media-source",
+			audio: {
+				contentType: `audio/webm; codecs=opus`,
+				bitrate: 100,
+			},
+		},
+		"mpeg-4 audio": {
+			type: "media-source",
+			audio: {
+				contentType: `audio/mp4; codecs="mp4a.40.2"`,
+				bitrate: 100,
+			},
+		},
+	};
+
+	public static async listSupportedProtocols(
+		codecs: string[],
+	): Promise<StreamProtocol[]> {
+		const ret = [StreamProtocol.HLS, StreamProtocol.LL_HLS];
+		if (codecs.length === 0) {
+			return ret;
+		}
+		let videoSupported = false;
+		let audioSupported = false;
+		const codecsOptions = codecs
+			.map((v) => {
+				v = v.toLocaleLowerCase();
+				if (v in HLSReader.codecMap) {
+					return HLSReader.codecMap[v];
+				}
+				console.error(`Unknown codec ${v}`);
+				return undefined;
+			})
+			.filter((v) => v !== undefined);
+		for (const codec of codecsOptions) {
+			const res = await navigator.mediaCapabilities.decodingInfo(codec);
+			if (res.supported) {
+				if (codec.audio) {
+					audioSupported = true;
+				} else if (codec.video) {
+					videoSupported = true;
+				}
+			}
+		}
+		if (audioSupported && videoSupported) {
+			return ret;
+		}
+		return [];
+	}
 }

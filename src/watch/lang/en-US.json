@@ -10,6 +10,7 @@
 	"statsUnavailable": "Stats Unavailable",
 	"playerStateLoading": "Stream Loading",
 	"playerStateOffline": "Stream Unavailable",
+	"deviceUnsupported": "Device Unsupported",
 	"error": "Error: {0}",
 
 	"latency": "Latency",

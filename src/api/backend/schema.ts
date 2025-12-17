@@ -4,7 +4,7 @@ import type { TokenObjectType } from "../endpoints/tokens";
 
 export default class DBSchema {
 	private static _version: string = new Date(
-		"2025-11-16T01:44:52+00:00",
+		"2025-12-17T01:17:12+00:00",
 	).toISOString();
 
 	public static async setup(conn: SQL) {
@@ -35,14 +35,26 @@ export default class DBSchema {
                     PRIMARY KEY(path)
                 )`;
 		}
-		// if (currentVersion < new Date("2025-11-16T01:44:52+00:00")) {
-		// 	//Future schema upgrades
-		// }
+		if (currentVersion <= new Date("2025-11-16T01:44:52+00:00")) {
+			await conn`CREATE TABLE IF NOT EXISTS api_auth (
+                    action varchar(50) NOT NULL,
+                    querytoken varchar(255) NOT NULL,
+                    created_at timestamp NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
+                    PRIMARY KEY (action, querytoken)
+                )`;
+		}
 		await conn`INSERT INTO versions (application, version) VALUES (${"db_version"}, ${DBSchema.getTargetVersion()})
                     ON CONFLICT (application) DO UPDATE SET version=${DBSchema.getTargetVersion()}`;
 		console.log(
 			`Upgraded remote database version to ${DBSchema.getTargetVersion()}`,
 		);
+	}
+
+	//TODO proper API key management
+	public static async getApiKey(conn: SQL): Promise<string | null> {
+		const res =
+			await conn`SELECT querytoken FROM api_auth WHERE action = ${"api"}`.values();
+		return res.length > 0 ? res[0][0] : null;
 	}
 
 	public static async getVersion(conn: SQL): Promise<string> {

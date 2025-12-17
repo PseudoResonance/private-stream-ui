@@ -2,6 +2,7 @@ export interface BackendConfig {
 	thumbnailUrl?: string;
 	webRtcUrl?: string;
 	hlsUrl?: string;
+	apiStatsUrl?: string;
 }
 
 export interface UserData {

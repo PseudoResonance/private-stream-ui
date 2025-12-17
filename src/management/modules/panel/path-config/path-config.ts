@@ -1,6 +1,7 @@
 import { html, css, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { TokenObjectType } from "../../../../api/endpoints/tokens";
+import { Byte, Encoder } from "@nuintun/qrcode";
 
 @customElement("path-config")
 export class PathConfig extends LitElement {
@@ -38,10 +39,16 @@ export class PathConfig extends LitElement {
 	private previewUrl: string = "";
 
 	@state()
+	private qrCodeUrl: string = "";
+
+	@state()
 	private thumbnailUrl: string = "";
 
 	@state()
 	private previewActive: boolean = false;
+
+	@state()
+	private qrActive: boolean = false;
 
 	private async fetchTokens() {
 		if (this.id.length === 0) {
@@ -78,6 +85,11 @@ export class PathConfig extends LitElement {
 					this.id,
 					token.querytoken as string,
 				);
+				const qrEncoder = new Encoder({
+					level: "M",
+				});
+				const qr = qrEncoder.encode(new Byte(this.previewUrl));
+				this.qrCodeUrl = qr.toDataURL();
 				this.thumbnailUrl = this.constructThumbnailUrl(
 					token.querytoken as string,
 				);
@@ -156,7 +168,8 @@ export class PathConfig extends LitElement {
 			background-position: center;
 			background-size: contain;
 		}
-		.streamPreviewPlaceholder {
+		.streamPreviewPlaceholder,
+		.qrCodePlaceholder {
 			display: flex;
 			justify-content: center;
 			align-items: center;
@@ -174,6 +187,7 @@ export class PathConfig extends LitElement {
 			border: solid thin var(--fg-primary-color);
 		}
 		.streamPreviewPlaceholder,
+		.qrCodePlaceholder,
 		[type="button"],
 		[type="reset"],
 		[type="submit"] {
@@ -181,6 +195,18 @@ export class PathConfig extends LitElement {
 		}
 		.streamPreview {
 			border: solid thin var(--fg-primary-color);
+		}
+		.qrCodePlaceholder {
+			width: 100%;
+			height: 100%;
+			background-color: black;
+		}
+		.qrCode {
+			width: 100%;
+			height: 100%;
+			image-rendering: pixelated;
+			image-rendering: -moz-crisp-edges;
+			image-rendering: crisp-edges;
 		}
 	`;
 
@@ -224,13 +250,65 @@ export class PathConfig extends LitElement {
 		return html``;
 	}
 
+	private getWatchQRCode() {
+		if (this.qrCodeUrl.length > 0) {
+			let inner;
+			if (this.qrActive) {
+				inner = html`<img
+					src="${this.qrCodeUrl}"
+					alt="QR code to watch page"
+					class="qrCode"
+				/>`;
+			} else {
+				inner = html`<button
+					class="qrCodePlaceholder"
+					@click="${() => {
+						this.qrActive = true;
+					}}"
+				>
+					Click to Generate
+				</button>`;
+			}
+			return html`<div class="sidebar">
+				<h3>QR Code</h3>
+				<div style="width:200px;height:200px;">${inner}</div>
+			</div>`;
+		}
+		return html``;
+	}
+
 	render() {
 		return html`<h3>
 				Stream
 				<span
 					style='font-family:"Google Sans Code", "Lucida Console", "Courier New", monospace'
-					>${this.id}</span
 				>
+					${this.id}
+				</span>
+				<table-button
+					@click="${async () => {
+						const deleteRes = await fetch(
+							`/api/v1/path?paths=${this.id}`,
+							{
+								method: "DELETE",
+							},
+						);
+						if (deleteRes.status !== 200) {
+							throw new Error(
+								`${deleteRes.status}: ${deleteRes.statusText} when deleting stream path!\n${deleteRes}`,
+							);
+						} else {
+							// A strange hack to parse the pathname a bit more accurately...
+							window.location.href = new URL(
+								window.location.pathname + "/../",
+								"http://localhost",
+							).pathname;
+						}
+					}}"
+					style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color); height: 1.75lh; display: inline-block;"
+				>
+					Delete
+				</table-button>
 			</h3>
 			<div class="wrapper">
 				<div class="primary">
@@ -344,30 +422,6 @@ export class PathConfig extends LitElement {
 						showHeader
 						showTitle
 					>
-						<table-button
-							@click="${async () => {
-								const deleteRes = await fetch(
-									`/api/v1/path?paths=${this.id}`,
-									{
-										method: "DELETE",
-									},
-								);
-								if (deleteRes.status !== 200) {
-									throw new Error(
-										`${deleteRes.status}: ${deleteRes.statusText} when deleting stream path!\n${deleteRes}`,
-									);
-								} else {
-									// A strange hack to parse the pathname a bit more accurately...
-									window.location.href = new URL(
-										window.location.pathname + "/../",
-										"http://localhost",
-									).pathname;
-								}
-							}}"
-							style="--bg-color: var(--bg-danger-color); --bg-color-hover: var(--bg-danger-color-hover); --fg-color: var(--fg-danger-color);"
-						>
-							Delete
-						</table-button>
 					</grid-table>
 				</div>
 				<div class="sidebar">
@@ -405,7 +459,7 @@ export class PathConfig extends LitElement {
 					>
 					</grid-table>
 				</div>
-				${this.getPreviewTemplate()}
+				${this.getPreviewTemplate()}${this.getWatchQRCode()}
 			</div>`;
 	}
 }

@@ -14,6 +14,7 @@ import { apiReference } from "@scalar/express-api-reference";
 import PathsEndpoints from "./endpoints/paths";
 import type Config from "../config";
 import TokensEndpoints from "./endpoints/tokens";
+import PathStatsEndpoints from "./endpoints/pathStats";
 
 export default class ApiHandler {
 	private static apiVersion: string = "1.0.0";
@@ -75,6 +76,13 @@ export default class ApiHandler {
 			ApiHandler.oidcInjectMiddleware,
 			this.config.options.maxTokens,
 		);
+		const pathStatsEndpoint = new PathStatsEndpoints(
+			this.api,
+			authHandler(),
+			ApiHandler.validateAuth,
+			ApiHandler.oidcInjectMiddleware,
+			this.config.options,
+		);
 		const routing: Routing = {
 			api: {
 				v1: {
@@ -82,6 +90,12 @@ export default class ApiHandler {
 						get: pathsEndpoint.listPathsEndpoint,
 						post: pathsEndpoint.createPathsEndpoint,
 						delete: pathsEndpoint.deletePathsEndpoint,
+					}),
+					pathstats: new DependsOnMethod({
+						get: pathStatsEndpoint.pathUserEndpoint,
+					}),
+					pathownerstats: new DependsOnMethod({
+						get: pathStatsEndpoint.pathOwnerEndpoint,
 					}),
 					privatepath: new DependsOnMethod({
 						post: pathsEndpoint.createPrivatePathEndpoint,
