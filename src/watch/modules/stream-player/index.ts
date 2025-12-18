@@ -153,7 +153,7 @@ export class StreamPlayer extends LitElement {
 		if (
 			!protocol ||
 			(this._validProtocols.length > 0 &&
-				!(protocol in this._validProtocols))
+				!this._validProtocols.includes(protocol))
 		) {
 			protocol = StreamReader.getBestProtocol(this._validProtocols);
 		}
@@ -228,7 +228,7 @@ export class StreamPlayer extends LitElement {
 				this.updateProtocolSettings();
 				if (
 					!this._streamProtocol ||
-					!(this._streamProtocol in this._validProtocols)
+					!this._validProtocols.includes(this._streamProtocol)
 				) {
 					this._streamProtocol = StreamReader.getBestProtocol(
 						this._validProtocols,
@@ -250,7 +250,7 @@ export class StreamPlayer extends LitElement {
 				await StreamReader.calculateSupportedProtocols([]);
 			if (
 				!this._streamProtocol ||
-				!(this._streamProtocol in this._validProtocols)
+				!this._validProtocols.includes(this._streamProtocol)
 			) {
 				this._streamProtocol = StreamReader.getBestProtocol(
 					this._validProtocols,

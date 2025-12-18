@@ -265,7 +265,7 @@ export class HLSReader extends GenericReader {
 		opus: {
 			type: "media-source",
 			audio: {
-				contentType: `audio/webm; codecs=opus`,
+				contentType: `audio/mp4; codecs=opus`,
 				bitrate: 100,
 			},
 		},
