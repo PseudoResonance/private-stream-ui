@@ -1,6 +1,6 @@
 import { StreamProtocol } from "..";
 import { i18n } from "../../../../../lang";
-import type { PlayerStats } from "../../types";
+import type { PlayerStats } from "../../modules/debug/types";
 import { prettyBytes, prettyMilliseconds, prettyNumber } from "../../util";
 import { GenericReader, PlayerState, type ReaderConf } from "../interface";
 

@@ -9,13 +9,7 @@ import { customElement, state } from "lit/decorators.js";
 
 import "media-chrome";
 import "media-chrome/menu";
-import {
-	PlayerState,
-	type PlayerStats,
-	type StatTypes,
-	type StatTypesAll,
-	type VideoResolution,
-} from "./types.ts";
+import { DebugStatsKey, PlayerState, type VideoResolution } from "./types.ts";
 import {
 	DefaultProtocols,
 	StreamProtocol,
@@ -26,11 +20,16 @@ import {
 	createIndicator,
 	createMenuItem,
 } from "media-chrome/dist/menu/media-chrome-menu.js";
-import { classMap } from "lit/directives/class-map.js";
 import { i18n } from "../../../lang.ts";
-import "./modules-debug/graph";
+import "./modules/debug/index.ts";
+import "./modules/error.ts";
 import type { BackendConfig } from "../../../types.ts";
 import type { PathPublicStatsObjectType } from "../../../api/endpoints/pathStats.ts";
+import type {
+	PlayerStats,
+	StatTypes,
+	StatTypesAll,
+} from "./modules/debug/types.ts";
 
 @customElement("stream-player")
 export class StreamPlayer extends LitElement {
@@ -58,7 +57,7 @@ export class StreamPlayer extends LitElement {
 		);
 
 		const viewportResizeObserver = new ResizeObserver(() => {
-			this._recalculateVideoFit();
+			this._setVideoFit();
 		});
 		viewportResizeObserver.observe(this.offsetParent ?? this);
 
@@ -115,9 +114,7 @@ export class StreamPlayer extends LitElement {
 	@state()
 	private _showDebugStats: boolean = false;
 	@state()
-	private _debugStats: Record<string, StatTypesAll> = {};
-
-	private _globalStats: Record<string, StatTypesAll> = {};
+	private _debugStats: StatTypesAll[][] = [];
 
 	private _retryTimer: NodeJS.Timeout | undefined = undefined;
 	private _streamReader: StreamReader;
@@ -162,32 +159,32 @@ export class StreamPlayer extends LitElement {
 			this._setErrorMessage(i18n("deviceUnsupported"));
 			this._streamProtocol = protocol;
 			this._streamReader.close();
-			this._debugStats = {};
-			this._globalStats = {};
+			this._debugStats = [];
 			this._checkRemoteState();
 		} else if (this._streamProtocol !== protocol) {
 			console.log(`Switching to protocol ${protocol}`);
 			this._streamProtocol = protocol;
 			localStorage.setItem("stream-protocol", protocol);
 			this._streamReader.close();
-			this._debugStats = {};
-			this._globalStats = {};
+			this._debugStats = [];
 			this._checkRemoteState();
 		}
 	};
 
-	private _handleDebugStats = (global: boolean = false) => {
+	private _handleDebugStats = (key: DebugStatsKey) => {
 		return (stats: PlayerStats) => {
-			const work = { ...(global ? this._globalStats : this._debugStats) };
-			for (const [id, entry] of Object.entries(stats)) {
-				if (!(id in work)) {
-					work[id] = entry;
+			const work = [...(this._debugStats[key] ?? [])];
+			for (const [i, entry] of stats.entries()) {
+				const findId = work.findIndex((e) => e.id === entry.id);
+				if (findId < 0) {
+					work[i] = entry;
 				} else {
 					switch (entry.type) {
 						case "graph":
-							const historyOld = (work[id] as StatTypes.StatGraph)
-								.history;
-							work[id] = entry;
+							const historyOld = (
+								work[findId] as StatTypes.StatGraph
+							).history;
+							work[i] = entry;
 							entry.history = historyOld.slice(
 								historyOld.length >=
 									StreamPlayer.STATS_MAX_HISTORY
@@ -198,16 +195,18 @@ export class StreamPlayer extends LitElement {
 							break;
 						case "value":
 						default:
-							work[id] = entry;
+							work[i] = entry;
 							break;
 					}
 				}
 			}
-			if (global) {
-				this._globalStats = work;
-			} else {
-				this._debugStats = work;
+			this._debugStats[key] = work;
+			for (let i = 0; i < key; i++) {
+				if (this._debugStats[i] === undefined) {
+					this._debugStats[i] = [];
+				}
 			}
+			this._debugStats = [...this._debugStats];
 		};
 	};
 
@@ -284,7 +283,7 @@ export class StreamPlayer extends LitElement {
 			await this._streamReader.start(
 				videoElem,
 				StreamPlayer.STATS_REFRESH_INTERVAL,
-				this._handleDebugStats(),
+				this._handleDebugStats(DebugStatsKey.PROTOCOL),
 				(e) => {
 					if (e && typeof e === "object") {
 						if ("message" in e) {
@@ -321,7 +320,7 @@ export class StreamPlayer extends LitElement {
 		}
 	};
 
-	private _recalculateVideoFit = () => {
+	private _setVideoFit = () => {
 		let viewportX = 0;
 		let viewportY = 0;
 		if (this.offsetParent !== null) {
@@ -356,7 +355,7 @@ export class StreamPlayer extends LitElement {
 					x: (e.composedPath()[0] as HTMLVideoElement).videoWidth,
 					y: (e.composedPath()[0] as HTMLVideoElement).videoHeight,
 				};
-				this._handleDebugStats(true)([
+				this._handleDebugStats(DebugStatsKey.VIDEO)([
 					{
 						type: "value",
 						id: "statResolution",
@@ -368,7 +367,7 @@ export class StreamPlayer extends LitElement {
 						),
 					},
 				]);
-				this._recalculateVideoFit();
+				this._setVideoFit();
 				this._videoInitState = PlayerState.READY;
 				this._errorMessage = "";
 			}}"
@@ -459,7 +458,13 @@ export class StreamPlayer extends LitElement {
 			<media-chrome-menu-item
 				@click="${() => {
 					this._showDebugStats = !this._showDebugStats;
-					this._debugStats = {};
+					if (
+						this._showDebugStats === false &&
+						this._debugStats.length >= DebugStatsKey.PROTOCOL
+					) {
+						this._debugStats[DebugStatsKey.PROTOCOL] = [];
+						this._debugStats = [...this._debugStats];
+					}
 					if (this._streamReader) {
 						this._streamReader.setDebugState(this._showDebugStats);
 					}
@@ -467,7 +472,13 @@ export class StreamPlayer extends LitElement {
 				@keydown="${(e: KeyboardEvent) => {
 					if (e.key === "Enter" || e.key === " ") {
 						this._showDebugStats = !this._showDebugStats;
-						this._debugStats = {};
+						if (
+							this._showDebugStats === false &&
+							this._debugStats.length >= DebugStatsKey.PROTOCOL
+						) {
+							this._debugStats[DebugStatsKey.PROTOCOL] = [];
+							this._debugStats = [...this._debugStats];
+						}
 						if (this._streamReader) {
 							this._streamReader.setDebugState(
 								this._showDebugStats,
@@ -504,99 +515,6 @@ export class StreamPlayer extends LitElement {
 		</media-settings-menu>`;
 	}
 
-	private _debugTemplateEntries(stats: Record<string, StatTypesAll>) {
-		return Object.values(stats).map((val) => {
-			const label = html`<span class="debugLabel"
-				>${i18n(val.key)}</span
-			>`;
-			switch (val.type) {
-				case "graph":
-					return html`${label}<debug-graph
-							maxEntries=${StreamPlayer.STATS_MAX_HISTORY}
-							.values=${val.history}
-							fillColor="${val.graphColor}"
-							backgroundColor="${val.backgroundColor}"
-							?stdDevScale=${val.stdDevScale}
-						>
-							<span>${val.valueString}</span>
-						</debug-graph>`;
-				case "value":
-				default:
-					return html`${label}
-						<div>${val.value}</div>`;
-			}
-		});
-	}
-
-	private _debugTemplate() {
-		return html`<div
-				class="debugClose"
-				aria-hidden="${this._showDebugStats}"
-				role="dialog"
-				aria-label="${i18n("debugInfo")}"
-				aria-modal="false"
-			>
-				<div
-					class="debugCloseButton"
-					role="button"
-					tabindex="0"
-					aria-pressed="false"
-					aria-label="${i18n("close")}"
-					focusable="${this._showDebugStats}"
-					aria-hidden="${this._showDebugStats}"
-					@click="${() => {
-						this._showDebugStats = false;
-						this._debugStats = {};
-						if (this._streamReader) {
-							this._streamReader.setDebugState(
-								this._showDebugStats,
-							);
-						}
-					}}"
-					@keydown="${(e: KeyboardEvent) => {
-						if (e.key === "Enter" || e.key === " ") {
-							this._showDebugStats = false;
-							this._debugStats = {};
-							if (this._streamReader) {
-								this._streamReader.setDebugState(
-									this._showDebugStats,
-								);
-							}
-						}
-					}}"
-				>
-					<svg
-						viewBox="0 0 11 11"
-						transform="translate(-5.5 2.25) rotate(45, 5.5, 5.5)"
-						width="100%"
-						height="100%"
-					>
-						<rect
-							width="100%"
-							height="1"
-							y="5"
-							fill="var(--fg-color)"
-						/>
-						<rect
-							width="1"
-							height="100%"
-							x="5"
-							fill="var(--fg-color)"
-						/>
-					</svg>
-				</div>
-			</div>
-			<div class="debugInner">
-				${Object.values(this._debugStats).length +
-					Object.values(this._globalStats).length >
-				0
-					? this._debugTemplateEntries(this._globalStats).concat(
-							this._debugTemplateEntries(this._debugStats),
-						)
-					: html`<div>${i18n("statsUnavailable")}</div>`}
-			</div>`;
-	}
-
 	static styles = css`
 		:host {
 			position: relative;
@@ -625,40 +543,6 @@ export class StreamPlayer extends LitElement {
 			display: none !important;
 		}
 
-		.error {
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: 100%;
-			height: 100%;
-			max-width: 100svw;
-			max-height: 100svh;
-			display: flex;
-			align-items: center;
-			text-align: center;
-			justify-content: center;
-			font-size: xx-large;
-			font-weight: bold;
-			color: var(--fg-color);
-			pointer-events: none;
-			touch-action: none;
-			padding: 20px;
-			box-sizing: border-box;
-			opacity: 100% !important;
-			user-select: none;
-			-webkit-touch-callout: none;
-			-webkit-user-select: none;
-			-ms-user-select: none;
-			-moz-user-select: none;
-		}
-		.error.active .errorContent {
-			padding: 10px;
-			background: var(--overlay-bg-color);
-			border-radius: var(--border-radius);
-			line-height: initial;
-			/* backdrop-filter: var(--popup-filter); */
-		}
-
 		.spacer {
 			flex-grow: 1;
 			background-color: var(
@@ -679,69 +563,6 @@ export class StreamPlayer extends LitElement {
 		media-pip-button[mediaispip] {
 			--media-primary-color: var(--button-active-color);
 		}
-
-		.debugWrapper {
-			--padding: 5px;
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: calc(100% - (2 * var(--padding)));
-			height: calc(100% - (2 * var(--padding)));
-			max-width: 100svw;
-			max-height: 100svh;
-			display: flex;
-			align-items: flex-start;
-			color: var(--fg-color);
-			pointer-events: none;
-			touch-action: none;
-			opacity: 100% !important;
-			user-select: none;
-			-webkit-touch-callout: none;
-			-webkit-user-select: none;
-			-ms-user-select: none;
-			-moz-user-select: none;
-			padding: var(--padding);
-		}
-		.debug {
-			display: none;
-			position: relative;
-		}
-		.debug.active {
-			display: flex;
-			flex-direction: column;
-			background: var(--overlay-bg-color);
-			border-radius: var(--border-radius);
-			line-height: initial;
-			/* backdrop-filter: var(--popup-filter); */
-		}
-		.debugInner {
-			--padding: 10px;
-			padding: var(--padding);
-			display: grid;
-			grid-template-columns: repeat(2, auto);
-			--gap: 0.05cm;
-			gap: var(--gap);
-			grid-column-gap: calc(4 * var(--gap));
-		}
-		.debugLabel {
-			justify-self: end;
-		}
-		.debugClose {
-			--padding: 5px;
-			display: flex;
-			align-items: flex-start;
-			justify-content: flex-end;
-			padding-right: var(--padding);
-			padding-top: var(--padding);
-		}
-		.debugCloseButton {
-			pointer-events: initial;
-			touch-action: initial;
-			position: relative;
-			cursor: pointer;
-			width: 0.4cm;
-			height: 0.4cm;
-		}
 	`;
 
 	render() {
@@ -750,26 +571,33 @@ export class StreamPlayer extends LitElement {
 				?gesturesdisabled="${this._errorMessage ? true : false}"
 			>
 				${this.videoTemplate()}${this.settingsTemplate()}
-				<div
-					class=${classMap({
-						active: this._errorMessage ? true : false,
-						error: true,
-					})}
-					aria-hidden="${this._errorMessage ? false : true}"
-					aria-modal="${this._errorMessage ? true : false}"
-				>
-					<span class="errorContent">${this._errorMessage}</span>
-				</div>
-				<div class="debugWrapper">
-					<div
-						class=${classMap({
-							active: this._showDebugStats,
-							debug: true,
-						})}
-					>
-						${this._showDebugStats ? this._debugTemplate() : ""}
-					</div>
-				</div>
+				<player-error ?visible=${this._errorMessage ? true : false}>
+					${this._errorMessage}
+				</player-error>
+				${this._showDebugStats
+					? html`<debug-window
+							maxEntries=${StreamPlayer.STATS_MAX_HISTORY}
+							.setVisible=${(state: boolean) => {
+								this._showDebugStats = state;
+								if (
+									state === false &&
+									this._debugStats.length >=
+										DebugStatsKey.PROTOCOL
+								) {
+									this._debugStats[DebugStatsKey.PROTOCOL] =
+										[];
+									this._debugStats = [...this._debugStats];
+								}
+								if (this._streamReader) {
+									this._streamReader.setDebugState(
+										this._showDebugStats,
+									);
+								}
+							}}
+							.stats=${this._debugStats}
+						>
+						</debug-window>`
+					: ""}
 				<media-control-bar>
 					<media-play-button
 						aria-disabled=${this._errorMessage ? true : false}
@@ -777,7 +605,8 @@ export class StreamPlayer extends LitElement {
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
-					></media-play-button>
+					>
+					</media-play-button>
 					<media-mute-button></media-mute-button>
 					<media-volume-range></media-volume-range>
 					<div class="spacer"></div>
@@ -787,21 +616,24 @@ export class StreamPlayer extends LitElement {
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
-					></media-cast-button>
+					>
+					</media-cast-button>
 					<media-airplay-button
 						aria-disabled=${this._errorMessage ? true : false}
 						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
-					></media-airplay-button>
+					>
+					</media-airplay-button>
 					<media-pip-button
 						aria-disabled=${this._errorMessage ? true : false}
 						?disabled="${this._errorMessage ? true : false}"
 						style="${this._errorMessage
 							? "pointer-events:none;touch-action:none;"
 							: ""}"
-					></media-pip-button>
+					>
+					</media-pip-button>
 					<media-settings-menu-button></media-settings-menu-button>
 					<media-fullscreen-button></media-fullscreen-button>
 				</media-control-bar>

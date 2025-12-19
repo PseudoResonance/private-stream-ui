@@ -1,5 +1,5 @@
 import type { StreamProtocol } from ".";
-import type { PlayerStats } from "../types";
+import type { PlayerStats } from "../modules/debug/types";
 
 export enum PlayerState {
 	INITIALIZING = "Initializing",

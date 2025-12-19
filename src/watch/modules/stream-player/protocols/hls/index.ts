@@ -2,8 +2,8 @@ import Hls, { ErrorTypes, type ErrorData } from "hls.js";
 import { GenericReader, PlayerState, type ReaderConf } from "../interface";
 import { StreamProtocol } from "..";
 import { i18n } from "../../../../../lang";
-import type { PlayerStats } from "../../types";
 import { prettyBytes, prettyMilliseconds, prettyNumber } from "../../util";
+import type { PlayerStats } from "../../modules/debug/types";
 
 interface HLSReaderConf extends ReaderConf {
 	videoElement: HTMLVideoElement;
@@ -211,6 +211,7 @@ export class HLSReader extends GenericReader {
 	};
 
 	//TODO better codec validation
+	//https://tools.axinom.com/capabilities/media
 	private static codecMap: Record<string, MediaDecodingConfiguration> = {
 		h264: {
 			type: "media-source",

@@ -2,8 +2,8 @@ import { WebRTCReader } from "./webrtc/index.ts";
 import type { BackendConfig } from "../../../../types.ts";
 import type { GenericReader } from "./interface.ts";
 import { HLSReader } from "./hls/index.ts";
-import type { PlayerStats } from "../types.ts";
 import { i18n } from "../../../../lang.ts";
+import type { PlayerStats } from "../modules/debug/types.ts";
 
 export enum StreamProtocol {
 	HLS = "hls",
