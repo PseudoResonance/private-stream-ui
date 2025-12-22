@@ -87,8 +87,10 @@ export class StreamPlayer extends LitElement {
 				case "allowed":
 					break;
 				case "allowed-muted":
-					console.log("Detected autoplay must be muted!");
-					videoElem.muted = true;
+					console.log(
+						"Detected autoplay must be muted! (Disabled to force autoplay preference dialog)",
+					);
+					//TODO videoElem.muted = true;
 					break;
 				default:
 					break;

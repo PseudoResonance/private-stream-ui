@@ -691,6 +691,7 @@ export class WebRTCReader extends GenericReader {
 		vp9: "video/vp9",
 		av1: "video/av1",
 		opus: "audio/opus",
+		"mpeg-4 audio": "audio/mp4",
 	};
 
 	public static async listSupportedProtocols(
